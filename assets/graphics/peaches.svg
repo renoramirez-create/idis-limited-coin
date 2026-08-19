@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 520 360">
+  <defs>
+    <linearGradient id="p" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#c1a8ff"/><stop offset="1" stop-color="#8b5cff"/></linearGradient>
+    <filter id="glow"><feGaussianBlur stdDeviation="4" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+  </defs>
+  <g fill="none" stroke="url(#p)" stroke-width="6" stroke-linejoin="round" filter="url(#glow)">
+    <path d="M245 151c-36-61-104-51-128-8-26 47 15 122 92 144 9 2 18 3 27 3 11 0 21-1 31-4 77-23 115-103 86-146-29-43-91-43-120 11"/>
+    <path d="M244 150c-15 41-13 86 7 132" opacity=".7"/>
+    <path d="M232 131c-13-49 7-83 55-101M259 90c26-34 61-45 105-33-19 33-48 49-88 49M223 102c-31-30-67-34-108-13 25 29 58 39 98 26" stroke="#65fff1"/>
+    <path d="M293 186c17-24 40-33 69-25 22 6 38 27 40 50 3 35-26 69-65 80-39-11-64-45-60-77 2-12 7-21 16-28Z" opacity=".7"/>
+  </g>
+</svg>

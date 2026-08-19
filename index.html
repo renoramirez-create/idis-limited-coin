@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
+  <meta name="theme-color" content="#05090c" />
+  <title>IDIS Americas | GSX 2026 AR Coin</title>
+  <meta name="description" content="Scan the limited GSX 2026 IDIS Americas coin and unlock an augmented reality experience." />
+
+  <!-- MindAR's current documentation pairs MindAR 1.2.5 with A-Frame 1.5.0. -->
+  <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
+  <link rel="stylesheet" href="./styles.css" />
+  <script src="./ar.js"></script>
+</head>
+<body>
+  <div id="app-ui">
+    <section id="intro" class="screen active" aria-label="Start augmented reality experience">
+      <div class="intro-glow glow-one"></div>
+      <div class="intro-glow glow-two"></div>
+      <div class="brand-lockup">
+        <span class="brand-mark" aria-hidden="true"><i></i><i></i></span>
+        <div><strong>IDIS</strong><span>AMERICAS</span></div>
+      </div>
+      <div class="intro-copy">
+        <div class="eyebrow">LIMITED GSX COLLECTIBLE</div>
+        <h1>Unlock<br />Atlanta.</h1>
+        <p>Point your phone at the <strong>GSX 2026 Atlanta coin</strong> to reveal the city, the state, and a layered AR moment built around the event.</p>
+      </div>
+      <button id="start-ar" class="primary-button" type="button">
+        <span>START AR EXPERIENCE</span><b aria-hidden="true">↗</b>
+      </button>
+      <div class="privacy-note">Camera access is used only for the live AR experience.</div>
+    </section>
+
+    <header id="ar-header" class="ar-ui hidden">
+      <div class="mini-brand"><span class="brand-mark mini" aria-hidden="true"><i></i><i></i></span><b>IDIS</b><span>AMERICAS</span></div>
+      <button id="close-ar" class="icon-button" type="button" aria-label="Close AR">×</button>
+    </header>
+
+    <div id="scan-status" class="ar-ui hidden" role="status" aria-live="polite">
+      <span class="status-dot"></span>
+      <span id="status-copy">LOOK FOR THE COIN</span>
+    </div>
+
+    <div id="scan-guide" class="ar-ui hidden" aria-hidden="true">
+      <div class="scan-ring"><span></span><span></span><span></span><span></span></div>
+      <div class="guide-copy">CENTER THE COIN</div>
+    </div>
+
+    <footer id="ar-footer" class="ar-ui hidden">
+      <div>
+        <span class="footer-kicker">GSX 2026</span>
+        <strong>ATLANTA, GEORGIA</strong>
+      </div>
+      <a href="https://idisamericas.com/" target="_blank" rel="noopener">EXPLORE IDIS <span>↗</span></a>
+    </footer>
+
+    <div id="error-card" class="error-card hidden" role="alert">
+      <strong>AR could not start.</strong>
+      <p>Please allow camera access, confirm this page is running over HTTPS, and reload the experience.</p>
+      <button id="retry-ar" type="button">TRY AGAIN</button>
+    </div>
+  </div>
+
+  <a-scene
+    id="ar-scene"
+    mindar-image="imageTargetSrc: ./assets/targets/gsx2026.mind; autoStart: false; filterMinCF: 0.001; filterBeta: 1000; warmupTolerance: 5; missTolerance: 10;"
+    color-space="sRGB"
+    renderer="colorManagement: true; physicallyCorrectLights: true; alpha: true; antialias: true;"
+    vr-mode-ui="enabled: false"
+    device-orientation-permission-ui="enabled: false"
+    loading-screen="enabled: false"
+    embedded>
+
+    <a-assets timeout="10000">
+      <img id="skyline-art" src="./assets/graphics/atlanta-skyline.svg" crossorigin="anonymous" />
+      <img id="georgia-art" src="./assets/graphics/georgia-state.svg" crossorigin="anonymous" />
+      <img id="stadium-art" src="./assets/graphics/stadium.svg" crossorigin="anonymous" />
+      <img id="phoenix-art" src="./assets/graphics/phoenix-statue.svg" crossorigin="anonymous" />
+      <img id="peaches-art" src="./assets/graphics/peaches.svg" crossorigin="anonymous" />
+    </a-assets>
+
+    <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
+    <a-entity id="coin-target" mindar-image-target="targetIndex: 0" gsx-hologram="preview: false"></a-entity>
+  </a-scene>
+</body>
+</html>

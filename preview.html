@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>IDIS GSX 2026 AR Scene Preview</title>
+  <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+  <link rel="stylesheet" href="./styles.css" />
+  <script src="./ar.js"></script>
+</head>
+<body class="preview-page">
+  <div class="preview-note"><b>DESKTOP PREVIEW</b><span>This simulates the AR layers without using the camera.</span></div>
+  <a-scene background="color: #05090c" renderer="colorManagement: true; physicallyCorrectLights: true; antialias: true;" vr-mode-ui="enabled: false">
+    <a-assets>
+      <img id="coin-preview" src="./assets/targets/gsx2026-coin-reference.png" crossorigin="anonymous" />
+      <img id="skyline-art" src="./assets/graphics/atlanta-skyline.svg" crossorigin="anonymous" />
+      <img id="georgia-art" src="./assets/graphics/georgia-state.svg" crossorigin="anonymous" />
+      <img id="stadium-art" src="./assets/graphics/stadium.svg" crossorigin="anonymous" />
+      <img id="phoenix-art" src="./assets/graphics/phoenix-statue.svg" crossorigin="anonymous" />
+      <img id="peaches-art" src="./assets/graphics/peaches.svg" crossorigin="anonymous" />
+    </a-assets>
+
+    <a-entity position="0 0 -2.6" rotation="-17 0 0" scale="1.15 1.15 1.15" preview-turntable>
+      <a-entity gsx-hologram="preview: true"></a-entity>
+    </a-entity>
+    <a-camera position="0 0 0"></a-camera>
+  </a-scene>
+</body>
+</html>
