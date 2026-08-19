@@ -8,33 +8,27 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <title>IDIS Americas | GSX 2026 AR Coin</title>
   <meta name="description" content="Scan either side of the limited IDIS Americas GSX 2026 coin and unlock an augmented reality experience." />
-
-  <!-- Official MindAR A-Frame pairing used by the current documentation. -->
   <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
   <link rel="stylesheet" href="./styles.css" />
   <script src="./ar.js"></script>
+  <script src="./calm-ar.js"></script>
 </head>
 <body>
   <!--
-    IMPORTANT:
-    assets/targets/gsx2026-two-sided.mind must contain TWO targets in this exact order:
+    assets/targets/gsx2026-two-sided.mind must contain TWO targets:
       targetIndex 0 = Atlanta / Georgia side
       targetIndex 1 = IDIS Americas side
-    See SETUP-TARGETS.html and README.md.
   -->
-
   <main id="app-ui" aria-live="polite">
     <section id="intro" class="screen" aria-label="Start augmented reality experience">
       <div class="intro-grid" aria-hidden="true"></div>
       <div class="intro-glow glow-one" aria-hidden="true"></div>
       <div class="intro-glow glow-two" aria-hidden="true"></div>
-
       <div class="brand-lockup" aria-label="IDIS Americas">
         <span class="brand-mark" aria-hidden="true"><i></i><i></i></span>
         <div><strong>IDIS</strong><span>AMERICAS</span></div>
       </div>
-
       <div class="intro-copy">
         <div class="eyebrow">GSX 2026 • LIMITED COLLECTIBLE</div>
         <h1>Scan.<br />Flip.<br />Discover.</h1>
@@ -43,7 +37,6 @@
           The Atlanta side unlocks the event location. The IDIS side unlocks the brand experience.
         </p>
       </div>
-
       <div class="intro-actions">
         <button id="start-ar" class="primary-button" type="button">
           <span>START AR EXPERIENCE</span><b aria-hidden="true">↗</b>
@@ -98,38 +91,31 @@
     </div>
   </main>
 
-  <!--
-    Dedicated AR stacking container.
-    MindAR appends its live camera <video> to sceneEl.parentNode, so keeping
-    the camera video and A-Frame scene inside one wrapper prevents the live
-    feed from being hidden behind the page or WebGL layer.
-  -->
   <div id="ar-container" aria-hidden="true">
-  <a-scene
-    id="ar-scene"
-    class="ar-stage"
-    mindar-image="imageTargetSrc: ./assets/targets/gsx2026-two-sided.mind; autoStart: false; uiLoading: no; uiError: no; uiScanning: no; filterMinCF: 0.001; filterBeta: 1000; warmupTolerance: 5; missTolerance: 10;"
-    color-space="sRGB"
-    renderer="colorManagement: true; physicallyCorrectLights: true; alpha: true; antialias: true;"
-    vr-mode-ui="enabled: false"
-    device-orientation-permission-ui="enabled: false"
-    loading-screen="enabled: false"
-    embedded>
+    <a-scene
+      id="ar-scene"
+      class="ar-stage"
+      mindar-image="imageTargetSrc: ./assets/targets/gsx2026-two-sided.mind; autoStart: false; uiLoading: no; uiError: no; uiScanning: no; filterMinCF: 0.0001; filterBeta: 0.001; warmupTolerance: 8; missTolerance: 20;"
+      color-space="sRGB"
+      renderer="colorManagement: true; physicallyCorrectLights: true; alpha: true; antialias: true;"
+      vr-mode-ui="enabled: false"
+      device-orientation-permission-ui="enabled: false"
+      loading-screen="enabled: false"
+      embedded>
 
-    <a-assets timeout="15000">
-      <img id="skyline-art" src="./assets/graphics/atlanta-skyline.svg" crossorigin="anonymous" />
-      <img id="georgia-art" src="./assets/graphics/georgia-state.svg" crossorigin="anonymous" />
-      <img id="stadium-art" src="./assets/graphics/stadium.svg" crossorigin="anonymous" />
-      <img id="phoenix-art" src="./assets/graphics/phoenix-statue.svg" crossorigin="anonymous" />
-      <img id="peaches-art" src="./assets/graphics/peaches.svg" crossorigin="anonymous" />
-    </a-assets>
+      <a-assets timeout="15000">
+        <img id="skyline-art" src="./assets/graphics/atlanta-skyline.svg" crossorigin="anonymous" />
+        <img id="georgia-art" src="./assets/graphics/georgia-state.svg" crossorigin="anonymous" />
+        <img id="stadium-art" src="./assets/graphics/stadium.svg" crossorigin="anonymous" />
+        <img id="phoenix-art" src="./assets/graphics/phoenix-statue.svg" crossorigin="anonymous" />
+        <img id="peaches-art" src="./assets/graphics/peaches.svg" crossorigin="anonymous" />
+      </a-assets>
 
-    <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
+      <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
 
-    <!-- Target order must match the order used in the MindAR compiler. -->
-    <a-entity id="atlanta-target" mindar-image-target="targetIndex: 0" gsx-hologram="preview: false"></a-entity>
-    <a-entity id="idis-target" mindar-image-target="targetIndex: 1" idis-hologram="preview: false"></a-entity>
-  </a-scene>
+      <a-entity id="atlanta-target" mindar-image-target="targetIndex: 0" gsx-hologram="preview: false"></a-entity>
+      <a-entity id="idis-target" mindar-image-target="targetIndex: 1" idis-hologram="preview: false"></a-entity>
+    </a-scene>
   </div>
 </body>
 </html>
