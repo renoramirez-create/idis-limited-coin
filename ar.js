@@ -119,7 +119,7 @@ AFRAME.registerComponent('gsx-hologram', {
   schema: { preview: { type: 'boolean', default: false } },
 
   init() {
-    const root = entity('a-entity', { class: 'experience-root atlanta-experience' });
+    const root = entity('a-entity', { class: 'experience-root atlanta-experience', visible: 'false' });
     this.el.appendChild(root);
     this.root = root;
 
@@ -185,17 +185,14 @@ AFRAME.registerComponent('gsx-hologram', {
 
     addText(title, 'GSX 2026', '-0.54 0.047 0.008', 1.6, IDIS_AR.tealSoft, { align: 'left', anchor: 'left', letterSpacing: '2' });
     addText(title, 'ATLANTA, GEORGIA  |  SEPT 14-16', '-0.54 -0.044 0.008', 0.90, IDIS_AR.white, { align: 'left', anchor: 'left' });
-    addText(title, 'SEE SECURITY SMARTER', '0.56 -0.087 0.008', 0.63, IDIS_AR.purpleSoft, { align: 'right', anchor: 'right' });
 
     const chip = entity('a-entity', { position: '0 -0.77 0.16', 'float-layer': 'amount: 0.015; speed: 1.15; phase: 2.1' });
     root.appendChild(chip);
     chip.appendChild(entity('a-plane', {
-      width: '0.67', height: '0.17',
+      width: '0.72', height: '0.14',
       material: 'color: #071014; opacity: 0.84; transparent: true; shader: flat'
     }));
-    addText(chip, 'IDIS', '-0.27 0.028 0.004', 0.80, IDIS_AR.white, { align: 'left', anchor: 'left', letterSpacing: '1.5' });
-    addText(chip, 'AMERICAS', '-0.05 0.028 0.004', 0.42, IDIS_AR.teal, { align: 'left', anchor: 'left' });
-    addText(chip, 'LIMITED GSX 2026 COIN', '0 -0.043 0.004', 0.48, '#cbd4d8', { letterSpacing: '.7' });
+    addText(chip, 'LIMITED IDIS 2026 COIN', '0 0 0.004', 0.58, '#cbd4d8', { letterSpacing: '.95' });
   },
 
   makeLocationArt(root) {
@@ -269,7 +266,7 @@ AFRAME.registerComponent('idis-hologram', {
   schema: { preview: { type: 'boolean', default: false } },
 
   init() {
-    const root = entity('a-entity', { class: 'experience-root idis-experience' });
+    const root = entity('a-entity', { class: 'experience-root idis-experience', visible: 'false' });
     this.el.appendChild(root);
     this.root = root;
 
@@ -627,7 +624,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
       intro.classList.add('hidden');
       setARUI(true);
+      status.classList.remove('hidden');
+      guide.classList.remove('hidden');
       statusCopy.textContent = 'STARTING CAMERA';
+      hideAllExperienceRoots();
       watchForCameraVideo();
 
       arSystem = await waitForSceneSystem();
@@ -656,7 +656,7 @@ document.addEventListener('DOMContentLoaded', () => {
       [50, 200, 500, 1000, 1800].forEach(delay => setTimeout(() => {
         if (active && myToken === sessionToken) styleCameraVideos();
       }, delay));
-      statusCopy.textContent = 'SCAN EITHER SIDE';
+      statusCopy.textContent = 'LOOK FOR THE COIN';
     } catch (error) {
       console.error('AR start failed:', error);
       if (error && error.code === 'HTTPS_REQUIRED') {
@@ -695,34 +695,59 @@ document.addEventListener('DOMContentLoaded', () => {
     stopAllCameraTracks();
     status.classList.remove('locked', 'error');
     sideChip.classList.add('hidden');
+    hideAllExperienceRoots();
     setARUI(false);
     intro.classList.remove('hidden');
   }
 
+  function getExperienceRoot(target) {
+    return target ? target.querySelector('.experience-root') : null;
+  }
+
+  function hideAllExperienceRoots() {
+    [atlantaTarget, idisTarget].forEach((target) => {
+      const root = getExperienceRoot(target);
+      if (root) root.setAttribute('visible', 'false');
+    });
+  }
+
   function revealTarget(target, side, statusLabel) {
+    foundTargets.clear();
     foundTargets.add(side);
     status.classList.remove('error');
     status.classList.add('locked');
     statusCopy.textContent = statusLabel;
+
+    // Scan UI should disappear once a side is locked.
     guide.classList.add('hidden');
+    status.classList.add('hidden');
+    sideChip.classList.add('hidden');
 
-    sideChipKicker.textContent = 'COIN SIDE';
-    sideChipCopy.textContent = side === 'atlanta' ? 'ATLANTA / GEORGIA' : 'IDIS AMERICAS';
-    sideChip.classList.remove('hidden');
+    // Only show the active experience. Hide the other side completely.
+    const currentRoot = getExperienceRoot(target);
+    const otherRoot = side === 'atlanta' ? getExperienceRoot(idisTarget) : getExperienceRoot(atlantaTarget);
+    if (otherRoot) otherRoot.setAttribute('visible', 'false');
 
-    const experienceRoot = target.querySelector('.experience-root');
-    if (experienceRoot) {
-      experienceRoot.removeAttribute('animation__reveal');
-      experienceRoot.setAttribute('scale', '0.78 0.78 0.78');
-      experienceRoot.setAttribute('animation__reveal', 'property: scale; to: 1 1 1; dur: 720; easing: easeOutBack');
+    if (currentRoot) {
+      currentRoot.setAttribute('visible', 'true');
+      currentRoot.removeAttribute('animation__reveal');
+      currentRoot.setAttribute('scale', '0.78 0.78 0.78');
+      currentRoot.setAttribute('animation__reveal', 'property: scale; to: 1 1 1; dur: 720; easing: easeOutBack');
     }
   }
 
   function loseTarget(side) {
     foundTargets.delete(side);
+
+    const target = side === 'atlanta' ? atlantaTarget : idisTarget;
+    const root = getExperienceRoot(target);
+    if (root) root.setAttribute('visible', 'false');
+
     if (foundTargets.size === 0) {
+      hideAllExperienceRoots();
       status.classList.remove('locked');
-      statusCopy.textContent = 'REACQUIRE COIN';
+      status.classList.remove('hidden');
+      statusCopy.textContent = 'LOOK FOR THE COIN';
       guide.classList.remove('hidden');
       sideChip.classList.add('hidden');
     }
@@ -742,7 +767,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!active && !starting) return;
     styleCameraVideos();
     status.classList.remove('error');
-    if (foundTargets.size === 0) statusCopy.textContent = 'SCAN EITHER SIDE';
+    if (foundTargets.size === 0) statusCopy.textContent = 'LOOK FOR THE COIN';
   });
 
   scene.addEventListener('arError', event => {
