@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>IDIS GSX 2026 | Target Setup</title>
+  <style>
+    :root{--teal:#18c9c3;--purple:#8b5cff;--white:#f4f8f9;--muted:rgba(244,248,249,.67)}*{box-sizing:border-box}body{margin:0;background:#05090c;color:var(--white);font-family:Inter,Aptos,"Segoe UI",Arial,sans-serif;min-height:100vh;padding:30px 18px 60px;background-image:radial-gradient(circle at 15% 5%,rgba(24,201,195,.13),transparent 30%),radial-gradient(circle at 90% 60%,rgba(139,92,255,.11),transparent 34%)}main{max-width:880px;margin:auto}.kicker{color:var(--teal);font-weight:900;letter-spacing:.15em;font-size:11px}h1{font-size:clamp(38px,8vw,68px);line-height:.94;letter-spacing:-.045em;margin:12px 0 16px}p{color:var(--muted);line-height:1.6}.notice{border:1px solid rgba(24,201,195,.28);background:rgba(24,201,195,.07);padding:16px;border-radius:15px;margin:22px 0}.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin:22px 0}.card{border:1px solid rgba(255,255,255,.13);border-radius:16px;background:rgba(255,255,255,.035);padding:14px}.card img{display:block;width:100%;aspect-ratio:1;object-fit:contain;border-radius:10px;background:#000}.card b{display:block;margin-top:12px}.card code{display:block;margin-top:5px;color:var(--teal);font-size:11px;word-break:break-all}.step{display:grid;grid-template-columns:36px 1fr;gap:12px;margin:17px 0}.n{width:32px;height:32px;border:1px solid rgba(24,201,195,.35);color:var(--teal);border-radius:50%;display:grid;place-items:center;font-weight:900}.step strong{display:block;margin:4px 0}.step p{margin:4px 0;font-size:14px}.actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:24px}.actions a,.actions button{padding:13px 16px;border-radius:12px;text-decoration:none;font-size:11px;font-weight:900;letter-spacing:.09em}.primary{background:var(--teal);color:#031013;border:0}.secondary{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);color:#fff}.status{margin-top:12px;font-size:12px;color:var(--muted)}.status.ok{color:#75ffcd}.status.bad{color:#ff9898}@media(max-width:650px){.grid{grid-template-columns:1fr}}
+  </style>
+</head>
+<body>
+<main>
+  <div class="kicker">IDIS AMERICAS • GSX 2026 WEBAR</div>
+  <h1>Build the two-sided target.</h1>
+  <p>MindAR needs one compiled <code>.mind</code> file containing both coin faces. The upload order sets each target index, so keep the order below exactly as shown.</p>
+
+  <div class="notice"><strong>Required output filename:</strong> <code>gsx2026-two-sided.mind</code><br />Place it in <code>assets/targets/</code>.</div>
+
+  <div class="grid">
+    <div class="card">
+      <img src="./assets/targets/gsx2026-coin-back.png" alt="GSX 2026 Atlanta Georgia coin side" />
+      <b>1. Atlanta / Georgia side</b>
+      <code>assets/targets/gsx2026-coin-back.png</code>
+    </div>
+    <div class="card">
+      <img src="./assets/targets/gsx2026-coin-front.png" alt="IDIS Americas coin side" />
+      <b>2. IDIS Americas side</b>
+      <code>assets/targets/gsx2026-coin-front.png</code>
+    </div>
+  </div>
+
+  <div class="step"><div class="n">1</div><div><strong>Open the official MindAR Image Targets Compiler.</strong><p>Use the button below and add both PNG files to the same compilation job.</p></div></div>
+  <div class="step"><div class="n">2</div><div><strong>Add Atlanta first, then IDIS.</strong><p>Atlanta must be target index 0. IDIS Americas must be target index 1.</p></div></div>
+  <div class="step"><div class="n">3</div><div><strong>Compile and download the target file.</strong><p>Rename the downloaded file to <code>gsx2026-two-sided.mind</code>.</p></div></div>
+  <div class="step"><div class="n">4</div><div><strong>Upload it to this project.</strong><p>Final path: <code>assets/targets/gsx2026-two-sided.mind</code>.</p></div></div>
+
+  <div class="actions">
+    <a class="primary" href="https://hiukim.github.io/mind-ar-js-doc/tools/compile/" target="_blank" rel="noopener">OPEN MINDAR COMPILER ↗</a>
+    <button class="secondary" id="check" type="button">CHECK TARGET FILE</button>
+    <a class="secondary" href="./index.html">BACK TO AR</a>
+  </div>
+  <div id="status" class="status">Target file has not been checked yet.</div>
+</main>
+<script>
+  document.querySelector('#check').addEventListener('click', async()=>{
+    const status=document.querySelector('#status');
+    status.className='status';
+    status.textContent='Checking assets/targets/gsx2026-two-sided.mind ...';
+    try{
+      const r=await fetch('./assets/targets/gsx2026-two-sided.mind?check='+Date.now(),{cache:'no-store'});
+      if(!r.ok) throw new Error('not found');
+      const b=await r.arrayBuffer();
+      if(b.byteLength<128) throw new Error('file is too small');
+      status.classList.add('ok');
+      status.textContent='Target file found. Size: '+Math.round(b.byteLength/1024)+' KB. The AR page is ready to attempt tracking.';
+    }catch(e){
+      status.classList.add('bad');
+      status.textContent='Target file is missing or unreadable. Compile both images and place gsx2026-two-sided.mind in assets/targets/.';
+    }
+  });
+</script>
+</body>
+</html>

@@ -3,16 +3,25 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>IDIS GSX 2026 AR Scene Preview</title>
+  <title>IDIS GSX 2026 Two-Sided AR Preview</title>
   <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
   <link rel="stylesheet" href="./styles.css" />
   <script src="./ar.js"></script>
+  <style>
+    .preview-controls{position:fixed;z-index:20;top:18px;right:18px;display:flex;gap:8px}.preview-controls button{border:1px solid rgba(255,255,255,.16);border-radius:999px;background:rgba(4,9,12,.78);color:#fff;padding:10px 13px;font-size:10px;font-weight:800;letter-spacing:.1em}.preview-controls button.active{border-color:#18c9c3;color:#65fff1}
+  </style>
 </head>
 <body class="preview-page">
-  <div class="preview-note"><b>DESKTOP PREVIEW</b><span>This simulates the AR layers without using the camera.</span></div>
+  <div class="preview-note"><b>DESKTOP PREVIEW</b><span>Switch between both coin-side AR scenes.</span></div>
+  <div class="preview-controls">
+    <button id="show-atlanta" class="active" type="button">ATLANTA SIDE</button>
+    <button id="show-idis" type="button">IDIS SIDE</button>
+  </div>
+
   <a-scene background="color: #05090c" renderer="colorManagement: true; physicallyCorrectLights: true; antialias: true;" vr-mode-ui="enabled: false">
     <a-assets>
-      <img id="coin-preview" src="./assets/targets/gsx2026-coin-reference.png" crossorigin="anonymous" />
+      <img id="coin-preview" src="./assets/targets/gsx2026-coin-back.png" crossorigin="anonymous" />
+      <img id="coin-front-preview" src="./assets/targets/gsx2026-coin-front.png" crossorigin="anonymous" />
       <img id="skyline-art" src="./assets/graphics/atlanta-skyline.svg" crossorigin="anonymous" />
       <img id="georgia-art" src="./assets/graphics/georgia-state.svg" crossorigin="anonymous" />
       <img id="stadium-art" src="./assets/graphics/stadium.svg" crossorigin="anonymous" />
@@ -20,10 +29,28 @@
       <img id="peaches-art" src="./assets/graphics/peaches.svg" crossorigin="anonymous" />
     </a-assets>
 
-    <a-entity position="0 0 -2.6" rotation="-17 0 0" scale="1.15 1.15 1.15" preview-turntable>
-      <a-entity gsx-hologram="preview: true"></a-entity>
+    <a-entity id="preview-stage" position="0 0 -2.6" rotation="-17 0 0" scale="1.15 1.15 1.15" preview-turntable>
+      <a-entity id="atlanta-preview" gsx-hologram="preview: true"></a-entity>
+      <a-entity id="idis-preview" visible="false" idis-hologram="preview: true"></a-entity>
     </a-entity>
     <a-camera position="0 0 0"></a-camera>
   </a-scene>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const atlanta = document.querySelector('#atlanta-preview');
+      const idis = document.querySelector('#idis-preview');
+      const aBtn = document.querySelector('#show-atlanta');
+      const iBtn = document.querySelector('#show-idis');
+      aBtn.addEventListener('click', () => {
+        atlanta.setAttribute('visible', true); idis.setAttribute('visible', false);
+        aBtn.classList.add('active'); iBtn.classList.remove('active');
+      });
+      iBtn.addEventListener('click', () => {
+        atlanta.setAttribute('visible', false); idis.setAttribute('visible', true);
+        iBtn.classList.add('active'); aBtn.classList.remove('active');
+      });
+    });
+  </script>
 </body>
 </html>

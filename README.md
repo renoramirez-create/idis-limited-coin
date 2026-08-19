@@ -1,115 +1,248 @@
-# IDIS Americas GSX 2026 WebAR Coin
+# IDIS Americas GSX 2026 Two-Sided WebAR Coin
 
-A mobile browser augmented reality experience built for the limited GSX 2026 Atlanta coin.
-The physical coin is the image target. Once recognized, the page anchors layered holographic
-Atlanta and Georgia visuals around it using MindAR + A-Frame.
+This package is a browser-based augmented reality experience for the limited IDIS Americas GSX 2026 coin.
 
-## Included
+Both sides are supported:
 
-- Mobile start screen and camera permission flow
-- Coin image tracking with MindAR
-- Teal and purple IDIS-inspired visual system
-- Layered parallax around the physical coin
-- Atlanta skyline hologram
-- Georgia state hologram
-- Stadium-inspired hologram
-- Atlanta Phoenix-inspired monument graphic
-- Peach State graphic
-- GSX 2026 / Atlanta / event date title card
-- IDIS Americas limited coin badge
-- Target found / target lost UI states
-- Desktop visual preview at `preview.html`
+- **Target 0:** GSX 2026 / Atlanta, Georgia
+- **Target 1:** IDIS Americas / One Solution • One Company
 
-## 1. Compile the coin target
+The project uses **MindAR image tracking + A-Frame** and is intended to be hosted as a standalone HTTPS page on the IDIS Americas website.
 
-MindAR requires a precompiled `.mind` target file.
+## What changed in this revision
 
-Official compiler:
-https://hiukim.github.io/mind-ar-js-doc/tools/compile/
+This build fixes the two problems found in the first prototype:
 
-Upload:
-`assets/targets/gsx2026-coin-reference.png`
+1. **Live camera not visible behind the AR canvas**
+   - The MindAR camera video is now explicitly kept visible below the transparent A-Frame canvas.
+   - A `MutationObserver` catches the camera `<video>` when MindAR inserts it and reapplies safe visibility/z-index settings.
+   - The code does **not** override MindAR's camera width/height/top/left values, so video-to-tracking alignment is preserved.
+   - Built-in MindAR loading/scanning/error overlays are disabled because this project provides its own HUD.
 
-Download the generated file, rename it to:
-`gsx2026.mind`
+2. **Close / X button not responding**
+   - The HTML HUD now sits far above the A-Frame/camera layers.
+   - The WebGL canvas has `pointer-events: none` because this scene has no direct 3D tapping requirements.
+   - The close button responds to `pointerup` on phones.
+   - Closing invalidates any in-progress camera startup, stops MindAR, and defensively stops all active camera tracks.
 
-Put it here:
-`assets/targets/gsx2026.mind`
+The start flow also checks for the required `.mind` file **before** hiding the landing screen. If the tracking file has not been compiled yet, the page now tells you exactly what is missing instead of leaving you with a black screen.
 
-## 2. Preview the design
+---
 
-`preview.html` renders the same AR content without the camera or tracking.
-Run the folder through a local web server instead of double-clicking the file.
+## Files
 
-Example with Python:
+```text
+IDIS-GSX2026-WebAR/
+├── index.html
+├── ar.js
+├── styles.css
+├── preview.html
+├── camera-test.html
+├── SETUP-TARGETS.html
+├── README.md
+├── AR-concept-reference.png
+└── assets/
+    ├── graphics/
+    │   ├── atlanta-skyline.svg
+    │   ├── georgia-state.svg
+    │   ├── peaches.svg
+    │   ├── phoenix-statue.svg
+    │   └── stadium.svg
+    └── targets/
+        ├── gsx2026-coin-back.png
+        ├── gsx2026-coin-front.png
+        ├── gsx2026-two-sided.mind   <-- YOU CREATE THIS ONCE
+        └── README.txt
+```
+
+---
+
+## Step 1 — Build the two-sided tracking file
+
+MindAR tracks a compiled `.mind` file, not the PNG directly.
+
+Open:
+
+`SETUP-TARGETS.html`
+
+It shows the correct target order and links to the official MindAR Image Targets Compiler.
+
+Compile both images in **one job** in this exact order:
+
+1. `assets/targets/gsx2026-coin-back.png`
+2. `assets/targets/gsx2026-coin-front.png`
+
+Download the generated file, rename it:
+
+`gsx2026-two-sided.mind`
+
+and place it here:
+
+`assets/targets/gsx2026-two-sided.mind`
+
+The target order matters because the HTML uses:
+
+```text
+targetIndex 0 = Atlanta / Georgia side
+targetIndex 1 = IDIS Americas side
+```
+
+---
+
+## Step 2 — Test the phone camera first
+
+Open:
+
+`camera-test.html`
+
+This page uses the browser camera without A-Frame or MindAR. It is useful for separating camera-permission/HTTPS problems from image-tracking problems.
+
+If the live camera works there, return to `index.html` and test the AR tracker.
+
+---
+
+## Step 3 — Preview both AR designs without a camera
+
+Open:
+
+`preview.html`
+
+Use the buttons in the upper-right corner to switch between:
+
+- Atlanta Side
+- IDIS Side
+
+Run the folder through a web server rather than double-clicking the files.
+
+Local development example:
 
 ```bash
 python -m http.server 8080
 ```
 
 Then open:
-`http://localhost:8080/preview.html`
 
-## 3. Test AR on a phone
+```text
+http://localhost:8080/preview.html
+```
 
-Camera access requires a secure context in normal production use, so deploy the folder to an
-HTTPS URL on the IDIS Americas website, for example:
+---
 
-`https://idisamericas.com/ar/gsx-2026/`
+## Step 4 — Test AR on a phone
 
-Point the campaign QR code to that URL.
+For production, host the entire folder on HTTPS, for example:
 
-The flow is:
+```text
+https://idisamericas.com/ar/gsx-2026/
+```
 
-QR code -> IDIS landing page -> Start AR -> camera permission -> scan coin -> AR layers appear
+Then point the QR code to that URL.
 
-## 4. Recommended WordPress / Divi deployment
+Suggested user flow:
 
-For the cleanest setup, upload the entire folder to a dedicated path on the same domain rather
-than pasting the AR scene into a Divi Code Module. The page needs full-screen camera/video and
-is easier to maintain as a standalone static page.
+```text
+QR code
+→ IDIS GSX landing screen
+→ Start AR Experience
+→ camera permission
+→ scan either coin side
+→ correct AR scene locks to that side
+→ flip coin to discover the other experience
+```
 
-Example server path:
-`/public_html/ar/gsx-2026/`
+---
 
-The folder's `index.html` becomes the landing page.
+## AR side 1 — Atlanta / Georgia
 
-## 5. Brand assets
+The Atlanta side includes:
 
-The supplied scene intentionally uses lightweight vector line art and an IDIS-inspired palette.
-For final production, replace the simple text lockup with an official IDIS Americas SVG/PNG logo
-if your brand team supplies one.
+- GSX 2026 title panel
+- Atlanta, Georgia and event dates
+- See Security Smarter
+- Atlanta skyline hologram
+- Georgia outline
+- stadium-inspired visual
+- Phoenix monument-inspired visual
+- peaches / Peach State visual
+- layered teal/purple orbit rings
+- parallax depth and floating motion
+- Limited GSX 2026 Coin badge
 
-Main colors are defined in both:
-- `styles.css`
-- `ar.js` (`IDIS_AR` object)
+## AR side 2 — IDIS Americas
 
-## 6. Adjusting placement
+The IDIS side includes:
 
-Edit `makeLocationArt()` in `ar.js`.
-Each asset has:
+- IDIS Americas header
+- See Security Smarter
+- One Solution • One Company
+- AI / Video / VMS / Secure / Data / Cloud nodes
+- animated scan beam
+- concentric telemetry rings
+- teal/purple orbit accents
+- layered parallax around the physical coin
 
-- `pos`: x, y, z position relative to the center of the coin
-- `w`: width
-- `h`: height
-- `amount`: floating/parallax motion amount
-- `phase`: animation timing offset
+---
 
-The Z value is important. Different Z depths produce the layered parallax effect as the user
-moves the phone around the coin.
+## WordPress / Divi deployment
 
-## 7. Coin tracking notes
+For this AR page, use a dedicated folder rather than pasting the entire scene into a Divi Code Module.
 
-A minted metal coin is more difficult to track than a flat printed card because highlights and
-reflections change with viewing angle. Use the detailed relief and asymmetric artwork as the
-tracking signal, and test the final physical coin under several lighting conditions.
+Example server location:
 
-If the minted result differs noticeably from the supplied render, compile the final `.mind` file
-from a straight-on photograph of the real manufactured coin.
+```text
+/public_html/ar/gsx-2026/
+```
+
+Upload the complete contents of this package to that folder.
+
+Make sure these files resolve publicly:
+
+```text
+/ar/gsx-2026/index.html
+/ar/gsx-2026/ar.js
+/ar/gsx-2026/styles.css
+/ar/gsx-2026/assets/targets/gsx2026-two-sided.mind
+```
+
+---
+
+## Troubleshooting
+
+### Black screen after tapping Start
+
+Check these in order:
+
+1. Open `camera-test.html`.
+2. Confirm the browser asked for and received camera permission.
+3. Confirm the site is HTTPS, or use localhost for development.
+4. Open `SETUP-TARGETS.html` and click **Check Target File**.
+5. Confirm `assets/targets/gsx2026-two-sided.mind` exists.
+6. Reload `index.html` after replacing the target file.
+
+### Camera works but coin is never recognized
+
+- Confirm both targets were compiled in the correct order.
+- Keep the coin mostly straight-on during initial acquisition.
+- Use soft lighting and avoid hard glare across the coin face.
+- Fill most of the circular guide with the coin.
+- Test the actual manufactured coin, not only a screen rendering.
+
+### Wrong experience appears on the wrong side
+
+The two images were compiled in the wrong order. Recompile:
+
+1. Atlanta first
+2. IDIS second
+
+### Close button
+
+The X now explicitly stops MindAR and the underlying camera tracks. If a browser keeps the camera indicator alive after leaving the page, close that browser tab and reopen the URL.
+
+---
 
 ## Libraries
 
 - A-Frame 1.5.0
 - MindAR 1.2.5
 
-The versions above follow the current MindAR installation examples for A-Frame image tracking.
+The project loads both libraries from their public CDNs.

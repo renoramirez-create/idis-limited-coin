@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
+  <meta name="theme-color" content="#02070a" />
+  <title>IDIS AR Camera Test</title>
+  <style>
+    :root{--teal:#18c9c3;--white:#f4f8f9}*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#02070a;font-family:Inter,Aptos,"Segoe UI",Arial,sans-serif;color:var(--white)}video{position:fixed;inset:0;width:100%;height:100%;object-fit:cover;background:#000}.shade{position:fixed;inset:0;pointer-events:none;background:linear-gradient(to bottom,rgba(0,0,0,.42),transparent 22%,transparent 70%,rgba(0,0,0,.48))}.top{position:fixed;z-index:10;top:max(16px,env(safe-area-inset-top));left:16px;right:16px;display:flex;justify-content:space-between;align-items:center}.brand{font-weight:900;letter-spacing:.04em}.brand span{color:var(--teal);font-size:11px}.close{width:46px;height:46px;border-radius:50%;border:1px solid rgba(255,255,255,.28);background:rgba(3,8,11,.74);color:#fff;font-size:31px;display:grid;place-items:center;padding:0 0 4px}.reticle{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);width:min(72vw,410px);aspect-ratio:1;border:1px solid rgba(255,255,255,.35);border-radius:50%;box-shadow:0 0 0 7px rgba(24,201,195,.10)}.bottom{position:fixed;z-index:10;left:16px;right:16px;bottom:max(16px,env(safe-area-inset-bottom));border:1px solid rgba(255,255,255,.17);background:rgba(4,9,12,.72);backdrop-filter:blur(14px);border-radius:15px;padding:13px 14px}.bottom b{display:block;color:var(--teal);font-size:10px;letter-spacing:.15em}.bottom span{display:block;margin-top:5px;color:rgba(255,255,255,.7);font-size:12px;line-height:1.4}.error{color:#ff9b9b!important}</style>
+</head>
+<body>
+  <video id="feed" autoplay muted playsinline webkit-playsinline></video>
+  <div class="shade"></div>
+  <div class="top"><div class="brand">IDIS <span>AMERICAS</span></div><button id="close" class="close" type="button" aria-label="Close">×</button></div>
+  <div class="reticle"></div>
+  <div class="bottom"><b id="state">STARTING CAMERA</b><span id="detail">This page tests the phone camera without MindAR tracking.</span></div>
+
+  <script>
+    const video = document.querySelector('#feed');
+    const state = document.querySelector('#state');
+    const detail = document.querySelector('#detail');
+    let stream = null;
+
+    function stopCamera(){
+      if(stream){stream.getTracks().forEach(track=>track.stop());stream=null;}
+      video.srcObject=null;
+    }
+
+    async function startCamera(){
+      try{
+        if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) throw new Error('Camera API unavailable');
+        stream = await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'}},audio:false});
+        video.srcObject=stream;
+        await video.play();
+        state.textContent='CAMERA WORKING';
+        detail.textContent='If you can see the live camera here, browser permission and HTTPS are working. Return to the AR page to test coin tracking.';
+      }catch(error){
+        console.error(error);
+        state.textContent='CAMERA ERROR';
+        state.classList.add('error');
+        detail.textContent=(!window.isSecureContext?'Open this page over HTTPS. ':'') + 'Allow camera access for this site, then reload.';
+      }
+    }
+
+    document.querySelector('#close').addEventListener('pointerup',event=>{event.preventDefault();stopCamera();location.href='./index.html';},{passive:false});
+    window.addEventListener('pagehide',stopCamera);
+    startCamera();
+  </script>
+</body>
+</html>
