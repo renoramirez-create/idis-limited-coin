@@ -1,3 +1,32 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>IDIS Parallax Asset Test</title><style>
-html,body{margin:0;height:100%;background:#04090c;color:#fff;font-family:Arial,sans-serif;overflow:hidden}.wrap{height:100%;display:grid;place-items:center;perspective:900px}.stage{position:relative;width:min(56.25vh,92vw);height:min(100vh,163vw);transform-style:preserve-3d;transition:transform .12s ease-out}.layer{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;pointer-events:none}.back{transform:translateZ(-35px)}.middle{transform:translateZ(0)}.front{transform:translateZ(55px)}.info{position:fixed;left:12px;right:12px;top:12px;padding:10px 12px;border:1px solid #ffffff30;border-radius:12px;background:#071014cc;z-index:5;font-size:12px}
-</style></head><body><div class="info">PARALLAX ASSET TEST • move your finger or mouse. If you see all three demo layers, the PNG paths are correct.</div><div class="wrap"><div class="stage" id="stage"><img class="layer back" src="./assets/parallax/atlanta/layer-1-back.png?v=20260819-master5"><img class="layer middle" src="./assets/parallax/atlanta/layer-2-middle.png?v=20260819-master5"><img class="layer front" src="./assets/parallax/atlanta/layer-3-front.png?v=20260819-master5"></div></div><script>const s=document.querySelector('#stage');function move(x,y){const rx=(.5-y)*8,ry=(x-.5)*8;s.style.transform=`rotateX(${rx}deg) rotateY(${ry}deg)`}addEventListener('pointermove',e=>move(e.clientX/innerWidth,e.clientY/innerHeight));addEventListener('pointerleave',()=>s.style.transform='');</script></body></html>
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>IDIS Square Parallax Asset Test</title>
+<style>
+html,body{margin:0;height:100%;background:#04090c;color:#fff;font-family:Arial,sans-serif;overflow:hidden}
+.wrap{height:100%;display:grid;place-items:center;perspective:900px}
+.stage{position:relative;width:min(86vw,86vh);height:min(86vw,86vh);transform-style:preserve-3d;transition:transform .12s ease-out}
+.layer{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;pointer-events:none}
+.back{transform:translateZ(-35px)} .middle{transform:translateZ(0)} .front{transform:translateZ(55px)}
+.info{position:fixed;left:12px;right:12px;top:12px;padding:10px 12px;border:1px solid #ffffff30;border-radius:12px;background:#071014cc;z-index:5;font-size:12px}
+</style>
+</head>
+<body>
+<div class="info">SQUARE PARALLAX ASSET TEST • move your finger or mouse. If you see three square demo layers, the PNG paths are correct.</div>
+<div class="wrap">
+  <div class="stage" id="stage">
+    <img class="layer back" src="./assets/parallax/atlanta/layer-1-back.png?v=20260820-depth7">
+    <img class="layer middle" src="./assets/parallax/atlanta/layer-2-middle.png?v=20260820-depth7">
+    <img class="layer front" src="./assets/parallax/atlanta/layer-3-front.png?v=20260820-depth7">
+  </div>
+</div>
+<script>
+const s=document.querySelector('#stage');
+function move(x,y){const rx=(.5-y)*8,ry=(x-.5)*8;s.style.transform=`rotateX(${rx}deg) rotateY(${ry}deg)`;}
+addEventListener('pointermove',e=>move(e.clientX/innerWidth,e.clientY/innerHeight));
+addEventListener('pointerleave',()=>s.style.transform='');
+</script>
+</body>
+</html>
