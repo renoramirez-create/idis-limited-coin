@@ -452,6 +452,7 @@ document.addEventListener('DOMContentLoaded', () => {
   let active = false;
   let cameraObserver = null;
   const foundTargets = new Set();
+  const lossTimers = new Map();
 
   const wait = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -631,6 +632,7 @@ document.addEventListener('DOMContentLoaded', () => {
       watchForCameraVideo();
 
       arSystem = await waitForSceneSystem();
+      if (window.IDIS_HQ_CAMERA) window.IDIS_HQ_CAMERA.patch(arSystem);
       if (myToken !== sessionToken) return;
 
       // MindAR starts camera acquisition asynchronously. Wait for an actual
@@ -681,6 +683,8 @@ document.addEventListener('DOMContentLoaded', () => {
     active = false;
     starting = false;
     foundTargets.clear();
+    lossTimers.forEach(timer => clearTimeout(timer));
+    lossTimers.clear();
     hideError();
     stopWatchingCamera();
 
@@ -704,53 +708,93 @@ document.addEventListener('DOMContentLoaded', () => {
     return target ? target.querySelector('.experience-root') : null;
   }
 
+  function getParallaxComponent() {
+    return atlantaTarget && atlantaTarget.components ? atlantaTarget.components['parallax-stack'] : null;
+  }
+
   function hideAllExperienceRoots() {
+    const parallax = getParallaxComponent();
+    if (parallax) parallax.reset();
+
     [atlantaTarget, idisTarget].forEach((target) => {
       const root = getExperienceRoot(target);
       if (root) root.setAttribute('visible', 'false');
     });
   }
 
+  function clearLossTimer(side) {
+    const timer = lossTimers.get(side);
+    if (timer) clearTimeout(timer);
+    lossTimers.delete(side);
+  }
+
   function revealTarget(target, side, statusLabel) {
+    clearLossTimer(side);
+    clearLossTimer(side === 'atlanta' ? 'idis' : 'atlanta');
+
     foundTargets.clear();
     foundTargets.add(side);
     status.classList.remove('error');
     status.classList.add('locked');
     statusCopy.textContent = statusLabel;
 
-    // Scan UI should disappear once a side is locked.
+    // Clean two-state UI: either scan guidance OR AR artwork, never both.
     guide.classList.add('hidden');
     status.classList.add('hidden');
     sideChip.classList.add('hidden');
 
-    // Only show the active experience. Hide the other side completely.
     const currentRoot = getExperienceRoot(target);
     const otherRoot = side === 'atlanta' ? getExperienceRoot(idisTarget) : getExperienceRoot(atlantaTarget);
     if (otherRoot) otherRoot.setAttribute('visible', 'false');
 
+    if (side === 'atlanta') {
+      const parallax = getParallaxComponent();
+      if (parallax) {
+        parallax.reset();
+        parallax.reveal();
+      } else if (currentRoot) {
+        currentRoot.setAttribute('visible', 'true');
+      }
+      return;
+    }
+
+    // Keep the existing IDIS-side reveal.
     if (currentRoot) {
       currentRoot.setAttribute('visible', 'true');
       currentRoot.removeAttribute('animation__reveal');
-      currentRoot.setAttribute('scale', '0.78 0.78 0.78');
-      currentRoot.setAttribute('animation__reveal', 'property: scale; to: 1 1 1; dur: 720; easing: easeOutBack');
+      currentRoot.setAttribute('scale', '0.86 0.86 0.86');
+      currentRoot.setAttribute('animation__reveal', 'property: scale; to: 1 1 1; dur: 760; easing: easeOutCubic');
     }
   }
 
   function loseTarget(side) {
-    foundTargets.delete(side);
+    clearLossTimer(side);
 
-    const target = side === 'atlanta' ? atlantaTarget : idisTarget;
-    const root = getExperienceRoot(target);
-    if (root) root.setAttribute('visible', 'false');
+    // Short debounce prevents one weak reflective frame from making the scene blink.
+    const timer = setTimeout(() => {
+      lossTimers.delete(side);
+      foundTargets.delete(side);
 
-    if (foundTargets.size === 0) {
-      hideAllExperienceRoots();
-      status.classList.remove('locked');
-      status.classList.remove('hidden');
-      statusCopy.textContent = 'LOOK FOR THE COIN';
-      guide.classList.remove('hidden');
-      sideChip.classList.add('hidden');
-    }
+      if (side === 'atlanta') {
+        const parallax = getParallaxComponent();
+        if (parallax) parallax.reset();
+      } else {
+        const target = idisTarget;
+        const root = getExperienceRoot(target);
+        if (root) root.setAttribute('visible', 'false');
+      }
+
+      if (foundTargets.size === 0) {
+        hideAllExperienceRoots();
+        status.classList.remove('locked');
+        status.classList.remove('hidden');
+        statusCopy.textContent = 'LOOK FOR THE COIN';
+        guide.classList.remove('hidden');
+        sideChip.classList.add('hidden');
+      }
+    }, 260);
+
+    lossTimers.set(side, timer);
   }
 
   scene.addEventListener('loaded', () => {

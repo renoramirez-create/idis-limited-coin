@@ -1,28 +1,63 @@
-IDIS GSX 2026 - 9:16 Portrait Parallax Patch
+IDIS GSX 2026 - PARALLAX + CALM MASTER PATCH
 
-Upload these files into your existing GitHub repository.
+WHY THE SHAKE CAME BACK
+The previous UI patch was based on the camera-fix build, so it restored the older aggressive MindAR tracking values. This package merges the calm tracking back in and keeps the new UI/logo behavior.
 
-REPLACE
-- parallax-config.js
-- assets/parallax/atlanta/layer-1-back.png
-- assets/parallax/atlanta/layer-2-middle.png
-- assets/parallax/atlanta/layer-3-front.png
+UPLOAD / REPLACE AT REPOSITORY ROOT
+- index.html            REPLACE
+- ar.js                 REPLACE
+- styles.css            REPLACE
+- calm-ar.js             NEW/REPLACE
+- parallax-config.js     NEW
+- parallax-ar.js         NEW
 
-ADD
-- assets/parallax/atlanta/DESIGN-GUIDE-1080x1920.png
+UPLOAD THIS ASSET
+- assets/ui/idis-logo.png
 
-New portrait layer specs
-- 1080 x 1920
-- transparent PNG
-- same exact center point on all 3 layers
-- build graphics mostly above and around the centered coin
+UPLOAD THIS FOLDER
+- assets/parallax/atlanta/
 
-Recommended layer usage
-- layer-1-back.png   atmosphere, glows, subtle rings, background structure
-- layer-2-middle.png skyline, state outline, stadium, peaches, mid-depth elements
-- layer-3-front.png event logo, GSX title, premium foreground accents
+KEEP YOUR EXISTING TARGET FILE
+- assets/targets/gsx2026-two-sided.mind
+Do not delete or overwrite it.
 
-Safe design note
-- keep the coin centered
-- avoid putting important text behind the coin circle
-- use the top third for logos and event identity
+THREE PNG LAYERS
+All three must remain exactly 1920 x 1080 and aligned to the same center:
+1. assets/parallax/atlanta/layer-1-back.png
+2. assets/parallax/atlanta/layer-2-middle.png
+3. assets/parallax/atlanta/layer-3-front.png
+
+The included PNGs are only working demo artwork. Replace them with your finished transparent PNGs using the same filenames.
+
+DESIGN GUIDE
+assets/parallax/atlanta/DESIGN-GUIDE-1920x1080.png
+Use it as a temporary Photoshop/Illustrator guide. Do not use it as an AR layer.
+
+DEPTH
+The layers use TRUE 3D target-space Z depth:
+Back   = 0.055
+Middle = 0.125
+Front  = 0.225
+This produces parallax naturally as the phone moves around the coin.
+
+REVEAL
+Back + middle fade in together: 720 ms
+Front begins after: 460 ms
+Front fades/scales forward over: 1450 ms
+Front starts at: 72% size
+
+EDIT THESE VALUES IN parallax-config.js.
+
+TRACKING
+MindAR has been reset to calmer values:
+filterMinCF: 0.0001
+filterBeta: 0.001
+warmupTolerance: 8
+missTolerance: 20
+
+calm-ar.js adds a second adaptive smoother and briefly holds the last good pose through tiny reflective tracking gaps.
+
+UI STATE
+When target found: scan guide disappears, AR appears.
+When target truly lost: AR disappears, scan guide returns.
+A short 260 ms loss debounce prevents one weak reflective frame from blinking the scene.

@@ -105,9 +105,9 @@ button { cursor: pointer; }
 }
 .intro-glow { position:absolute; border-radius:50%; filter: blur(70px); pointer-events:none; opacity:.45; }
 
-.idis-logo { display:block; height:auto; object-fit:contain; filter: drop-shadow(0 6px 22px rgba(0,0,0,.28)); }
-.hero-logo { width:min(235px, 46vw); }
-.mini-logo { width:112px; }
+.idis-logo { display:block; width:auto; object-fit:contain; filter: drop-shadow(0 6px 22px rgba(0,0,0,.28)); }
+.hero-logo { width:min(170px, 40vw); max-height:42px; }
+.mini-logo { width:88px; max-height:20px; }
 .glow-one { width:240px; height:240px; background:rgba(24,201,195,.24); left:-100px; top:12%; }
 .glow-two { width:280px; height:280px; background:rgba(139,92,255,.20); right:-130px; bottom:12%; }
 
@@ -270,4 +270,9 @@ button { cursor: pointer; }
   .secondary-link { display:none; }
   #ar-footer { padding:11px 12px; }
   #ar-footer strong { font-size:11px; }
+}
+
+@media (max-width: 420px) {
+  .hero-logo { width:min(150px, 42vw); max-height:38px; }
+  .mini-logo { width:78px; max-height:18px; }
 }
