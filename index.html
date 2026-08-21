@@ -12,12 +12,8 @@
   <!-- Official MindAR A-Frame pairing used by the current documentation. -->
   <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
-  <link rel="stylesheet" href="./styles.css?v=20260820-upright8" />
-  <script src="./parallax-config.js?v=20260820-upright8"></script>
-  <script src="./parallax-ar.js?v=20260820-upright8"></script>
-  <script src="./hq-camera.js?v=20260820-upright8"></script>
-  <script src="./ar.js?v=20260820-upright8"></script>
-  <script src="./calm-ar.js?v=20260820-upright8"></script>
+  <link rel="stylesheet" href="./styles.css?v=20260821-overlay9" />
+  <script src="./ar.js?v=20260821-overlay9"></script>
 </head>
 <body>
   <!--
@@ -35,7 +31,8 @@
       <div class="intro-glow glow-two" aria-hidden="true"></div>
 
       <div class="brand-lockup" aria-label="IDIS Americas">
-        <img class="idis-logo hero-logo" src="./assets/ui/idis-logo.png?v=20260820-upright8" alt="IDIS Americas" />
+        <span class="brand-mark" aria-hidden="true"><i></i><i></i></span>
+        <div><strong>IDIS</strong><span>AMERICAS</span></div>
       </div>
 
       <div class="intro-copy">
@@ -57,8 +54,9 @@
     </section>
 
     <header id="ar-header" class="ar-ui hidden">
-      <div class="mini-brand" aria-label="IDIS Americas">
-        <img class="idis-logo mini-logo" src="./assets/ui/idis-logo.png?v=20260820-upright8" alt="IDIS Americas" />
+      <div class="mini-brand">
+        <span class="brand-mark mini" aria-hidden="true"><i></i><i></i></span>
+        <b>IDIS</b><span>AMERICAS</span>
       </div>
       <button id="close-ar" class="icon-button" type="button" aria-label="Close augmented reality">×</button>
     </header>
@@ -89,6 +87,21 @@
       <a href="https://idisamericas.com/" target="_blank" rel="noopener">EXPLORE IDIS <span>↗</span></a>
     </footer>
 
+
+    <!--
+      Atlanta screen-upright parallax overlay.
+      These are normal HTML images, not planes parented to the coin.
+      That means they stay upright while the physical coin can rotate freely.
+    -->
+    <div id="atlanta-parallax" class="atlanta-parallax hidden" aria-hidden="true">
+      <img id="atlanta-layer-back" class="atlanta-layer layer-back"
+           src="./assets/parallax/atlanta/layer-1-back.png?v=20260821-overlay9" alt="" />
+      <img id="atlanta-layer-middle" class="atlanta-layer layer-middle"
+           src="./assets/parallax/atlanta/layer-2-middle.png?v=20260821-overlay9" alt="" />
+      <img id="atlanta-layer-front" class="atlanta-layer layer-front"
+           src="./assets/parallax/atlanta/layer-3-front.png?v=20260821-overlay9" alt="" />
+    </div>
+
     <div id="error-card" class="error-card hidden" role="alert">
       <button id="error-close" class="error-close" type="button" aria-label="Close error">×</button>
       <strong id="error-title">AR could not start.</strong>
@@ -118,10 +131,7 @@
     loading-screen="enabled: false"
     embedded>
 
-    <a-assets timeout="20000">
-      <img id="px-atlanta-back" src="./assets/parallax/atlanta/layer-1-back.png?v=20260820-upright8" crossorigin="anonymous" />
-      <img id="px-atlanta-middle" src="./assets/parallax/atlanta/layer-2-middle.png?v=20260820-upright8" crossorigin="anonymous" />
-      <img id="px-atlanta-front" src="./assets/parallax/atlanta/layer-3-front.png?v=20260820-upright8" crossorigin="anonymous" />
+    <a-assets timeout="15000">
       <img id="skyline-art" src="./assets/graphics/atlanta-skyline.svg" crossorigin="anonymous" />
       <img id="georgia-art" src="./assets/graphics/georgia-state.svg" crossorigin="anonymous" />
       <img id="stadium-art" src="./assets/graphics/stadium.svg" crossorigin="anonymous" />
@@ -132,7 +142,7 @@
     <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
 
     <!-- Target order must match the order used in the MindAR compiler. -->
-    <a-entity id="atlanta-target" mindar-image-target="targetIndex: 0" parallax-stack></a-entity>
+    <a-entity id="atlanta-target" mindar-image-target="targetIndex: 0"></a-entity>
     <a-entity id="idis-target" mindar-image-target="targetIndex: 1" idis-hologram="preview: false"></a-entity>
   </a-scene>
   </div>

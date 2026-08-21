@@ -104,15 +104,19 @@ button { cursor: pointer; }
   mask-image: linear-gradient(to bottom, transparent, black 20%, black 76%, transparent);
 }
 .intro-glow { position:absolute; border-radius:50%; filter: blur(70px); pointer-events:none; opacity:.45; }
-
-.idis-logo { display:block; width:auto; object-fit:contain; filter: drop-shadow(0 6px 22px rgba(0,0,0,.28)); }
-.hero-logo { width:min(170px, 40vw); max-height:42px; }
-.mini-logo { width:88px; max-height:20px; }
 .glow-one { width:240px; height:240px; background:rgba(24,201,195,.24); left:-100px; top:12%; }
 .glow-two { width:280px; height:280px; background:rgba(139,92,255,.20); right:-130px; bottom:12%; }
 
 .brand-lockup, .mini-brand { position: relative; z-index: 2; display: flex; align-items: center; gap: 11px; letter-spacing: .02em; }
-.brand-lockup { margin-bottom: 10px; }
+.brand-lockup > div { display: flex; align-items: baseline; gap: 8px; }
+.brand-lockup strong { font-size: 25px; letter-spacing: .025em; }
+.brand-lockup span:not(.brand-mark) { color: var(--idis-teal); font-weight: 700; font-size: 15px; }
+.brand-mark { display: inline-flex; width: 29px; height: 29px; position: relative; transform: rotate(-45deg); }
+.brand-mark i { position: absolute; width: 18px; height: 9px; border-radius: 2px; background: var(--idis-teal); box-shadow: 0 0 18px rgba(24,201,195,.28); }
+.brand-mark i:first-child { left: 0; top: 4px; }
+.brand-mark i:last-child { right: 0; bottom: 4px; }
+.brand-mark.mini { width: 18px; height: 18px; }
+.brand-mark.mini i { width: 12px; height: 6px; }
 
 .intro-copy { position: relative; z-index: 2; margin-top: auto; max-width: 620px; }
 .eyebrow { color: var(--idis-teal); font-size: 11px; font-weight: 800; letter-spacing: .19em; margin-bottom: 12px; }
@@ -272,7 +276,60 @@ button { cursor: pointer; }
   #ar-footer strong { font-size:11px; }
 }
 
-@media (max-width: 420px) {
-  .hero-logo { width:min(150px, 42vw); max-height:38px; }
-  .mini-logo { width:78px; max-height:18px; }
+
+/* --------------------------------------------------------------------------
+   ATLANTA SCREEN-UPRIGHT PARALLAX
+   The physical coin remains visible through transparent areas in the PNGs.
+---------------------------------------------------------------------------- */
+.atlanta-parallax {
+  position: fixed;
+  inset: 0;
+  z-index: 9000;
+  pointer-events: none;
+  overflow: hidden;
+  opacity: 1;
+  visibility: visible;
+}
+
+.atlanta-parallax.hidden {
+  opacity: 0 !important;
+  visibility: hidden !important;
+  display: block !important;
+}
+
+.atlanta-layer {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 1920px;
+  height: 1920px;
+  max-width: none;
+  object-fit: contain;
+  transform-origin: 50% 50%;
+  opacity: 0;
+  will-change: transform, opacity;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  image-rendering: auto;
+  filter: none;
+}
+
+.atlanta-parallax.is-visible .layer-back,
+.atlanta-parallax.is-visible .layer-middle {
+  animation: idisLayerBaseReveal 760ms cubic-bezier(.22,.61,.36,1) forwards;
+}
+
+.atlanta-parallax.is-visible .layer-front {
+  animation: idisLayerFrontReveal 1550ms cubic-bezier(.16,.84,.26,1) 500ms forwards;
+}
+
+@keyframes idisLayerBaseReveal {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes idisLayerFrontReveal {
+  0%   { opacity: 0; }
+  15%  { opacity: .10; }
+  100% { opacity: 1; }
 }

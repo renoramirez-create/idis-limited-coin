@@ -119,7 +119,7 @@ AFRAME.registerComponent('gsx-hologram', {
   schema: { preview: { type: 'boolean', default: false } },
 
   init() {
-    const root = entity('a-entity', { class: 'experience-root atlanta-experience', visible: 'false' });
+    const root = entity('a-entity', { class: 'experience-root atlanta-experience' });
     this.el.appendChild(root);
     this.root = root;
 
@@ -185,14 +185,17 @@ AFRAME.registerComponent('gsx-hologram', {
 
     addText(title, 'GSX 2026', '-0.54 0.047 0.008', 1.6, IDIS_AR.tealSoft, { align: 'left', anchor: 'left', letterSpacing: '2' });
     addText(title, 'ATLANTA, GEORGIA  |  SEPT 14-16', '-0.54 -0.044 0.008', 0.90, IDIS_AR.white, { align: 'left', anchor: 'left' });
+    addText(title, 'SEE SECURITY SMARTER', '0.56 -0.087 0.008', 0.63, IDIS_AR.purpleSoft, { align: 'right', anchor: 'right' });
 
     const chip = entity('a-entity', { position: '0 -0.77 0.16', 'float-layer': 'amount: 0.015; speed: 1.15; phase: 2.1' });
     root.appendChild(chip);
     chip.appendChild(entity('a-plane', {
-      width: '0.72', height: '0.14',
+      width: '0.67', height: '0.17',
       material: 'color: #071014; opacity: 0.84; transparent: true; shader: flat'
     }));
-    addText(chip, 'LIMITED IDIS 2026 COIN', '0 0 0.004', 0.58, '#cbd4d8', { letterSpacing: '.95' });
+    addText(chip, 'IDIS', '-0.27 0.028 0.004', 0.80, IDIS_AR.white, { align: 'left', anchor: 'left', letterSpacing: '1.5' });
+    addText(chip, 'AMERICAS', '-0.05 0.028 0.004', 0.42, IDIS_AR.teal, { align: 'left', anchor: 'left' });
+    addText(chip, 'LIMITED GSX 2026 COIN', '0 -0.043 0.004', 0.48, '#cbd4d8', { letterSpacing: '.7' });
   },
 
   makeLocationArt(root) {
@@ -266,7 +269,7 @@ AFRAME.registerComponent('idis-hologram', {
   schema: { preview: { type: 'boolean', default: false } },
 
   init() {
-    const root = entity('a-entity', { class: 'experience-root idis-experience', visible: 'false' });
+    const root = entity('a-entity', { class: 'experience-root idis-experience' });
     this.el.appendChild(root);
     this.root = root;
 
@@ -422,6 +425,10 @@ AFRAME.registerComponent('idis-hologram', {
 /* --------------------------------------------------------------------------
    UI + MINDAR LIFECYCLE
 */
+/* --------------------------------------------------------------------------
+   UI + MINDAR LIFECYCLE
+   Atlanta uses a SCREEN-SPACE overlay so all 1920x1920 layers remain upright.
+---------------------------------------------------------------------------- */
 document.addEventListener('DOMContentLoaded', () => {
   const scene = document.querySelector('#ar-scene');
   const arContainer = document.querySelector('#ar-container');
@@ -429,6 +436,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const atlantaTarget = document.querySelector('#atlanta-target');
   const idisTarget = document.querySelector('#idis-target');
+
   const intro = document.querySelector('#intro');
   const header = document.querySelector('#ar-header');
   const footer = document.querySelector('#ar-footer');
@@ -436,33 +444,55 @@ document.addEventListener('DOMContentLoaded', () => {
   const statusCopy = document.querySelector('#status-copy');
   const guide = document.querySelector('#scan-guide');
   const sideChip = document.querySelector('#side-chip');
-  const sideChipKicker = document.querySelector('#side-chip-kicker');
-  const sideChipCopy = document.querySelector('#side-chip-copy');
+
   const errorCard = document.querySelector('#error-card');
   const errorTitle = document.querySelector('#error-title');
   const errorCopy = document.querySelector('#error-copy');
+
   const startButton = document.querySelector('#start-ar');
   const retryButton = document.querySelector('#retry-ar');
   const closeButton = document.querySelector('#close-ar');
   const errorClose = document.querySelector('#error-close');
 
+  const overlay = document.querySelector('#atlanta-parallax');
+  const layerBack = document.querySelector('#atlanta-layer-back');
+  const layerMiddle = document.querySelector('#atlanta-layer-middle');
+  const layerFront = document.querySelector('#atlanta-layer-front');
+
+  const TARGET_FILE = './assets/targets/gsx2026-two-sided.mind';
+
   let arSystem = null;
   let starting = false;
-  let sessionToken = 0;
   let active = false;
+  let sessionToken = 0;
   let cameraObserver = null;
-  let currentVisibleSide = null;
-  const foundTargets = new Set();
-  const lossTimers = new Map();
+  let currentSide = null;
+  let lossTimer = null;
+  let overlayRAF = 0;
 
-  const wait = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+  // Smoothed screen anchor and offsets.
+  let sx = 0, sy = 0;
+  let smx = 0, smy = 0;
+  let sfx = 0, sfy = 0;
+  let initializedOverlay = false;
+  let frontRevealStart = 0;
+
+  const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
+  const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
+  const lerp = (a, b, t) => a + (b - a) * t;
+  const easeOutCubic = t => 1 - Math.pow(1 - clamp(t, 0, 1), 3);
 
   function setARUI(show) {
-    [header, footer, status, guide].forEach(el => el && el.classList.toggle('hidden', !show));
-    if (!show && sideChip) sideChip.classList.add('hidden');
+    [header, footer].forEach(el => el && el.classList.toggle('hidden', !show));
+    if (!show) {
+      status.classList.add('hidden');
+      guide.classList.add('hidden');
+      sideChip.classList.add('hidden');
+    }
   }
 
   function showScanUI(text = 'LOOK FOR THE COIN') {
+    if (!active && !starting) return;
     status.classList.remove('hidden', 'error', 'locked');
     guide.classList.remove('hidden');
     sideChip.classList.add('hidden');
@@ -470,15 +500,46 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function hideScanUI() {
-    guide.classList.add('hidden');
     status.classList.add('hidden');
+    guide.classList.add('hidden');
     sideChip.classList.add('hidden');
+  }
+
+  function hideAtlantaOverlay() {
+    cancelAnimationFrame(overlayRAF);
+    overlayRAF = 0;
+    initializedOverlay = false;
+    frontRevealStart = 0;
+
+    overlay.classList.remove('is-visible');
+    overlay.classList.add('hidden');
+
+    [layerBack, layerMiddle, layerFront].forEach(layer => {
+      layer.style.opacity = '0';
+      layer.style.transform = 'translate3d(-9999px,-9999px,0)';
+      layer.style.animation = 'none';
+    });
+
+    // Force CSS animation reset for the next detection.
+    void overlay.offsetWidth;
+    [layerBack, layerMiddle, layerFront].forEach(layer => layer.style.animation = '');
+  }
+
+  function showAtlantaOverlay() {
+    hideAtlantaOverlay();
+
+    overlay.classList.remove('hidden');
+    overlay.classList.add('is-visible');
+    frontRevealStart = performance.now();
+
+    updateAtlantaOverlay(true);
   }
 
   function showError(title, copy, statusText = 'AR ERROR') {
     errorTitle.textContent = title;
     errorCopy.textContent = copy;
     errorCard.classList.remove('hidden');
+    status.classList.remove('hidden');
     status.classList.add('error');
     statusCopy.textContent = statusText;
   }
@@ -491,7 +552,6 @@ document.addEventListener('DOMContentLoaded', () => {
   function forceTransparentRenderer() {
     if (!scene || !scene.renderer) return;
     try {
-      // CSS transparency alone is not enough if WebGL clears opaque black.
       scene.renderer.setClearColor(0x000000, 0);
       scene.renderer.setClearAlpha(0);
       if (scene.renderer.domElement) {
@@ -506,7 +566,6 @@ document.addEventListener('DOMContentLoaded', () => {
   function styleCameraVideos() {
     const videos = arContainer ? [...arContainer.querySelectorAll('video')] : [...document.querySelectorAll('video')];
     videos.forEach(video => {
-      // Ignore future asset videos. MindAR's live camera has a MediaStream.
       if (!video.srcObject && video.closest('a-assets')) return;
       video.classList.add('mindar-camera-feed');
       video.setAttribute('playsinline', '');
@@ -563,9 +622,7 @@ document.addEventListener('DOMContentLoaded', () => {
         video.srcObject.getTracks().forEach(track => track.stop());
         video.pause();
         video.srcObject = null;
-      } catch (error) {
-        console.warn('Camera cleanup warning:', error);
-      }
+      } catch (_) {}
     });
   }
 
@@ -581,106 +638,221 @@ document.addEventListener('DOMContentLoaded', () => {
 
   async function verifyTargetFile() {
     try {
-      const response = await fetch(`${TARGET_FILE}?v=20260819`, { cache: 'no-store' });
+      const response = await fetch(`${TARGET_FILE}?v=20260821`, { cache: 'no-store' });
       if (!response.ok) return false;
       const buffer = await response.arrayBuffer();
       return buffer.byteLength > 128;
-    } catch (error) {
-      console.warn('Target-file check failed:', error);
+    } catch (_) {
       return false;
     }
   }
 
-  function explainCameraError(error) {
-    const name = error && error.name ? error.name : '';
-    if (!window.isSecureContext && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') {
-      return 'The camera requires HTTPS. Upload the AR folder to an HTTPS address on the IDIS Americas website and open it there.';
+  function projectTargetToScreen() {
+    const camera = scene.camera;
+    const canvas = scene.canvas;
+    if (!camera || !canvas) return null;
+
+    const rect = canvas.getBoundingClientRect();
+    const world = new THREE.Vector3();
+    atlantaTarget.object3D.getWorldPosition(world);
+
+    const projected = world.clone().project(camera);
+    if (!Number.isFinite(projected.x) || !Number.isFinite(projected.y)) return null;
+
+    return {
+      x: rect.left + (projected.x + 1) * 0.5 * rect.width,
+      y: rect.top + (1 - (projected.y + 1) * 0.5) * rect.height,
+      rect,
+      camera
+    };
+  }
+
+  function getTiltInputs(camera) {
+    const targetQuat = new THREE.Quaternion();
+    const cameraQuat = new THREE.Quaternion();
+    const invCamera = new THREE.Quaternion();
+    const normal = new THREE.Vector3(0, 0, 1);
+
+    atlantaTarget.object3D.getWorldQuaternion(targetQuat);
+    camera.getWorldQuaternion(cameraQuat);
+    invCamera.copy(cameraQuat).invert();
+
+    normal.applyQuaternion(targetQuat).applyQuaternion(invCamera).normalize();
+
+    return {
+      x: clamp(normal.x, -0.8, 0.8),
+      y: clamp(normal.y, -0.8, 0.8)
+    };
+  }
+
+  function updateAtlantaOverlay(force = false) {
+    if (!active || currentSide !== 'atlanta' || overlay.classList.contains('hidden')) return;
+
+    const projected = projectTargetToScreen();
+    if (!projected) {
+      overlayRAF = requestAnimationFrame(() => updateAtlantaOverlay(false));
+      return;
     }
-    if (name === 'NotAllowedError' || name === 'PermissionDeniedError') {
-      return 'Camera permission was blocked. Allow camera access for this site, then tap Try Again.';
+
+    const { x, y, rect, camera } = projected;
+    const tilt = getTiltInputs(camera);
+
+    // Square size is based on the long screen dimension so the back layer fills
+    // most of the phone display, like the preview.
+    const longSide = Math.max(window.innerWidth, window.innerHeight);
+    const baseSize = longSide * 0.92;
+    const backSize = baseSize * 1.12;
+
+    const nx = clamp((x - rect.left - rect.width / 2) / Math.max(1, rect.width / 2), -1, 1);
+    const ny = clamp((y - rect.top - rect.height / 2) / Math.max(1, rect.height / 2), -1, 1);
+
+    // Middle is about 40 design pixels above the back.
+    const middleYOffset = -(40 / 1920) * baseSize;
+
+    const middleTargetX = (-tilt.x * baseSize * 0.040) - (nx * baseSize * 0.018);
+    const middleTargetY = middleYOffset + (tilt.y * baseSize * 0.030) + (ny * baseSize * 0.012);
+
+    const frontTargetX = (-tilt.x * baseSize * 0.105) - (nx * baseSize * 0.045);
+    const frontTargetY = (tilt.y * baseSize * 0.072) + (ny * baseSize * 0.032);
+
+    if (!initializedOverlay || force) {
+      sx = x; sy = y;
+      smx = middleTargetX; smy = middleTargetY;
+      sfx = frontTargetX; sfy = frontTargetY;
+      initializedOverlay = true;
+    } else {
+      // Strong smoothing keeps the layout calm.
+      sx = lerp(sx, x, 0.13);
+      sy = lerp(sy, y, 0.13);
+      smx = lerp(smx, middleTargetX, 0.10);
+      smy = lerp(smy, middleTargetY, 0.10);
+      sfx = lerp(sfx, frontTargetX, 0.11);
+      sfy = lerp(sfy, frontTargetY, 0.11);
     }
-    if (name === 'NotFoundError' || name === 'DevicesNotFoundError') {
-      return 'No usable camera was found on this device.';
+
+    // Back: large, calm, centered on the tracked coin.
+    layerBack.style.width = `${backSize}px`;
+    layerBack.style.height = `${backSize}px`;
+    layerBack.style.transform =
+      `translate3d(${sx - backSize/2}px, ${sy - backSize/2}px, 0)`;
+
+    // Middle: same square coordinate system, subtle parallax and +40px design lift.
+    layerMiddle.style.width = `${baseSize}px`;
+    layerMiddle.style.height = `${baseSize}px`;
+    layerMiddle.style.transform =
+      `translate3d(${sx + smx - baseSize/2}px, ${sy + smy - baseSize/2}px, 0)`;
+
+    // Front: strongest parallax and dramatic scale-in.
+    const elapsed = frontRevealStart ? performance.now() - frontRevealStart : 2000;
+    const revealT = easeOutCubic((elapsed - 500) / 1550);
+    const frontScale = lerp(0.68, 1.0, revealT);
+
+    layerFront.style.width = `${baseSize}px`;
+    layerFront.style.height = `${baseSize}px`;
+    layerFront.style.transform =
+      `translate3d(${sx + sfx - baseSize/2}px, ${sy + sfy - baseSize/2}px, 0) scale(${frontScale})`;
+
+    overlayRAF = requestAnimationFrame(() => updateAtlantaOverlay(false));
+  }
+
+  function hideIDISExperience() {
+    const root = idisTarget.querySelector('.experience-root');
+    if (root) root.setAttribute('visible', 'false');
+  }
+
+  function showIDISExperience() {
+    const root = idisTarget.querySelector('.experience-root');
+    if (root) {
+      root.setAttribute('visible', 'true');
+      root.removeAttribute('animation__reveal');
+      root.setAttribute('scale', '0.86 0.86 0.86');
+      root.setAttribute('animation__reveal',
+        'property: scale; to: 1 1 1; dur: 760; easing: easeOutCubic');
     }
-    if (name === 'NotReadableError' || name === 'TrackStartError') {
-      return 'The camera is already in use by another app or browser tab. Close it there and try again.';
-    }
-    if (error && error.code === 'CAMERA_FRAME_TIMEOUT') {
-      return 'Camera permission was granted, but no live camera frame became available. Reload the page, close other camera apps or tabs, and try again.';
-    }
-    return 'The AR engine could not open the camera. Confirm camera permission, HTTPS hosting, and the target file, then try again.';
+  }
+
+  function resetDetectedState() {
+    if (lossTimer) clearTimeout(lossTimer);
+    lossTimer = null;
+    currentSide = null;
+    hideAtlantaOverlay();
+    hideIDISExperience();
+  }
+
+  function foundAtlanta() {
+    if (!active) return;
+    if (lossTimer) clearTimeout(lossTimer);
+    lossTimer = null;
+    if (currentSide === 'atlanta') return;
+
+    currentSide = 'atlanta';
+    hideIDISExperience();
+    hideScanUI();
+    showAtlantaOverlay();
+  }
+
+  function foundIDIS() {
+    if (!active) return;
+    if (lossTimer) clearTimeout(lossTimer);
+    lossTimer = null;
+    if (currentSide === 'idis') return;
+
+    currentSide = 'idis';
+    hideAtlantaOverlay();
+    hideScanUI();
+    showIDISExperience();
+  }
+
+  function lostSide(side) {
+    if (!active || currentSide !== side) return;
+    if (lossTimer) clearTimeout(lossTimer);
+
+    // Brief hold prevents one weak reflective frame from causing a blink.
+    lossTimer = setTimeout(() => {
+      if (currentSide !== side) return;
+      resetDetectedState();
+      showScanUI('LOOK FOR THE COIN');
+    }, 420);
   }
 
   async function startAR() {
     if (starting || active) return;
+
     starting = true;
     const myToken = ++sessionToken;
     hideError();
-    foundTargets.clear();
-    status.classList.remove('locked', 'error');
-    statusCopy.textContent = 'CHECKING TARGETS';
+    resetDetectedState();
 
     try {
-      if (!window.isSecureContext && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') {
-        throw Object.assign(new Error('HTTPS_REQUIRED'), { code: 'HTTPS_REQUIRED' });
-      }
-
-      // The previous prototype could appear black when the .mind file had not
-      // been created yet. Check it before hiding the landing screen.
       const targetReady = await verifyTargetFile();
       if (!targetReady) {
-        showError(
-          'Two-sided tracking file is missing.',
-          'Create gsx2026-two-sided.mind from the Atlanta image first and the IDIS image second. The included Target Setup page walks through the exact order.',
-          'TARGET FILE MISSING'
-        );
+        showError('Tracking file is missing.',
+          'Keep gsx2026-two-sided.mind inside assets/targets/.',
+          'TARGET FILE MISSING');
         return;
       }
 
       intro.classList.add('hidden');
-      currentVisibleSide = null;
       setARUI(true);
       showScanUI('STARTING CAMERA');
-      hideAllExperienceRoots();
       watchForCameraVideo();
 
       arSystem = await waitForSceneSystem();
-      if (window.IDIS_HQ_CAMERA) window.IDIS_HQ_CAMERA.patch(arSystem);
       if (myToken !== sessionToken) return;
 
-      // MindAR starts camera acquisition asynchronously. Wait for an actual
-      // live frame before treating the AR session as ready for the user.
-      arSystem.start();
-      const cameraVideo = await waitForLiveCamera();
-      if (myToken !== sessionToken) {
-        try { arSystem.stop(); } catch (_) {}
-        stopAllCameraTracks();
-        return;
-      }
+      await Promise.resolve(arSystem.start());
+      await waitForLiveCamera();
+
+      if (myToken !== sessionToken) return;
 
       active = true;
       styleCameraVideos();
-      forceTransparentRenderer();
-      console.info('IDIS AR camera live', {
-        width: cameraVideo.videoWidth,
-        height: cameraVideo.videoHeight,
-        readyState: cameraVideo.readyState
-      });
-      // The inserted camera element can be restyled by MindAR during sizing.
-      // Re-apply only visibility/layering a few times without changing geometry.
-      [50, 200, 500, 1000, 1800].forEach(delay => setTimeout(() => {
-        if (active && myToken === sessionToken) styleCameraVideos();
-      }, delay));
       showScanUI('LOOK FOR THE COIN');
     } catch (error) {
-      console.error('AR start failed:', error);
-      if (error && error.code === 'HTTPS_REQUIRED') {
-        showError('HTTPS is required for camera access.', 'Host this folder at an HTTPS URL. Localhost also works for development.', 'HTTPS REQUIRED');
-      } else {
-        showError('Camera could not start.', explainCameraError(error), 'CAMERA ERROR');
-      }
-      // If the landing screen was already hidden, keep the close control and
-      // camera HUD visible behind the diagnostic card.
+      console.error(error);
+      showError('Camera could not start.',
+        'Allow camera permission, close other camera apps, then try again.',
+        'CAMERA ERROR');
     } finally {
       starting = false;
     }
@@ -692,150 +864,33 @@ document.addEventListener('DOMContentLoaded', () => {
       event.stopPropagation();
     }
 
-    ++sessionToken; // invalidates any in-flight start()
+    ++sessionToken;
     active = false;
     starting = false;
-    currentVisibleSide = null;
-    foundTargets.clear();
-    lossTimers.forEach(timer => clearTimeout(timer));
-    lossTimers.clear();
+    resetDetectedState();
     hideError();
     stopWatchingCamera();
 
     try {
       if (!arSystem && scene.systems) arSystem = scene.systems['mindar-image-system'];
       if (arSystem) await Promise.resolve(arSystem.stop());
-    } catch (error) {
-      console.warn('MindAR stop warning:', error);
-    }
+    } catch (_) {}
 
-    // Defensive cleanup for browsers that keep a MediaStream alive after stop.
     stopAllCameraTracks();
 
-    // Hard-reset the visual state so the next session always starts clean.
-    status.classList.remove('locked', 'error', 'hidden');
-    guide.classList.remove('hidden');
+    status.classList.remove('locked', 'error');
+    status.classList.add('hidden');
+    guide.classList.add('hidden');
     sideChip.classList.add('hidden');
-    statusCopy.textContent = 'START AR EXPERIENCE';
-    hideAllExperienceRoots();
-
-    [atlantaTarget, idisTarget].forEach((target) => {
-      if (target && target.object3D) target.object3D.visible = false;
-    });
-
     setARUI(false);
     intro.classList.remove('hidden');
-  }
-
-  function getExperienceRoot(target) {
-    // The Atlanta parallax root is attached directly to the scene so it can
-    // remain screen-upright instead of inheriting the coin's rotation.
-    if (target === atlantaTarget) {
-      const parallax = getParallaxComponent();
-      if (parallax && parallax.root) return parallax.root;
-    }
-    return target ? target.querySelector('.experience-root') : null;
-  }
-
-  function getParallaxComponent() {
-    return atlantaTarget && atlantaTarget.components ? atlantaTarget.components['parallax-stack'] : null;
-  }
-
-  function hideAllExperienceRoots() {
-    currentVisibleSide = null;
-    const parallax = getParallaxComponent();
-    if (parallax) parallax.reset();
-
-    [atlantaTarget, idisTarget].forEach((target) => {
-      const root = getExperienceRoot(target);
-      if (root) root.setAttribute('visible', 'false');
-    });
-  }
-
-  function clearLossTimer(side) {
-    const timer = lossTimers.get(side);
-    if (timer) clearTimeout(timer);
-    lossTimers.delete(side);
-  }
-
-  function revealTarget(target, side, statusLabel) {
-    if (!active) return;
-
-    clearLossTimer(side);
-    clearLossTimer(side === 'atlanta' ? 'idis' : 'atlanta');
-
-    // Ignore repeated found events for the same side to prevent blinking/restarting.
-    if (currentVisibleSide === side && foundTargets.has(side)) return;
-
-    foundTargets.clear();
-    foundTargets.add(side);
-    currentVisibleSide = side;
-
-    status.classList.remove('error');
-    status.classList.add('locked');
-    statusCopy.textContent = statusLabel;
-
-    // Clean two-state UI: either scan guidance OR AR artwork, never both.
-    hideScanUI();
-
-    const currentRoot = getExperienceRoot(target);
-    const otherRoot = side === 'atlanta' ? getExperienceRoot(idisTarget) : getExperienceRoot(atlantaTarget);
-    if (otherRoot) otherRoot.setAttribute('visible', 'false');
-
-    if (side !== 'atlanta') {
-      const atlantaParallax = getParallaxComponent();
-      if (atlantaParallax) atlantaParallax.reset();
-    }
-
-    if (side === 'atlanta') {
-      const parallax = getParallaxComponent();
-      if (parallax) {
-        parallax.reset();
-        parallax.reveal();
-      } else if (currentRoot) {
-        currentRoot.setAttribute('visible', 'true');
-      }
-      return;
-    }
-
-    // Keep the existing IDIS-side reveal.
-    if (currentRoot) {
-      currentRoot.setAttribute('visible', 'true');
-      currentRoot.removeAttribute('animation__reveal');
-      currentRoot.setAttribute('scale', '0.86 0.86 0.86');
-      currentRoot.setAttribute('animation__reveal', 'property: scale; to: 1 1 1; dur: 760; easing: easeOutCubic');
-    }
-  }
-
-  function loseTarget(side) {
-    clearLossTimer(side);
-
-    const timer = setTimeout(() => {
-      lossTimers.delete(side);
-      foundTargets.delete(side);
-
-      if (side === 'atlanta') {
-        const parallax = getParallaxComponent();
-        if (parallax) parallax.reset();
-      } else {
-        const root = getExperienceRoot(idisTarget);
-        if (root) root.setAttribute('visible', 'false');
-      }
-
-      if (currentVisibleSide === side) currentVisibleSide = null;
-
-      if (foundTargets.size === 0) {
-        hideAllExperienceRoots();
-        showScanUI('LOOK FOR THE COIN');
-      }
-    }, 380);
-
-    lossTimers.set(side, timer);
   }
 
   scene.addEventListener('loaded', () => {
     arSystem = scene.systems['mindar-image-system'];
     forceTransparentRenderer();
+    hideIDISExperience();
+    hideAtlantaOverlay();
   });
 
   scene.addEventListener('renderstart', () => {
@@ -844,37 +899,29 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   scene.addEventListener('arReady', () => {
-    if (!active && !starting) return;
-    styleCameraVideos();
-    status.classList.remove('error');
-    if (foundTargets.size === 0 && !currentVisibleSide) showScanUI('LOOK FOR THE COIN');
+    if (active && !currentSide) showScanUI('LOOK FOR THE COIN');
   });
 
-  scene.addEventListener('arError', event => {
-    if (!starting && !active) return;
-    console.error('MindAR arError:', event);
-    showError('AR engine error.', 'The camera or image-tracking engine could not initialize. Check camera permission, HTTPS hosting, and the two-sided .mind target file.', 'AR ERROR');
-  });
+  atlantaTarget.addEventListener('targetFound', foundAtlanta);
+  atlantaTarget.addEventListener('targetLost', () => lostSide('atlanta'));
 
-  atlantaTarget.addEventListener('targetFound', () => revealTarget(atlantaTarget, 'atlanta', 'ATLANTA SIDE LOCKED'));
-  atlantaTarget.addEventListener('targetLost', () => loseTarget('atlanta'));
-  idisTarget.addEventListener('targetFound', () => revealTarget(idisTarget, 'idis', 'IDIS SIDE LOCKED'));
-  idisTarget.addEventListener('targetLost', () => loseTarget('idis'));
+  idisTarget.addEventListener('targetFound', foundIDIS);
+  idisTarget.addEventListener('targetLost', () => lostSide('idis'));
 
   startButton.addEventListener('click', startAR);
   retryButton.addEventListener('click', startAR);
 
-  // pointerup makes the close control responsive on phones even if a canvas is
-  // doing pointer handling. click is kept as a keyboard/mouse fallback.
+  // Use both events. stopAR is idempotent.
   closeButton.addEventListener('pointerup', stopAR, { passive: false });
   closeButton.addEventListener('touchend', stopAR, { passive: false });
-  closeButton.addEventListener('click', event => {
-    stopAR(event);
-  });
-  errorClose.addEventListener('click', () => hideError());
+  closeButton.addEventListener('click', stopAR);
+
+  errorClose.addEventListener('click', hideError);
 
   window.addEventListener('pagehide', () => {
     ++sessionToken;
+    active = false;
+    resetDetectedState();
     try { if (arSystem) arSystem.stop(); } catch (_) {}
     stopAllCameraTracks();
   });

@@ -3,42 +3,32 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>IDIS Upright Parallax Preview</title>
+<title>IDIS Atlanta Overlay Preview</title>
 <style>
-*{box-sizing:border-box}
-html,body{margin:0;height:100%;background:#04090c;color:#fff;font-family:Arial,sans-serif;overflow:hidden}
-.preview{position:relative;width:100%;height:100%;display:grid;place-items:center;background:
-radial-gradient(circle at 50% 50%,#123039 0,#071014 38%,#030608 78%)}
-.stage{position:relative;width:min(96vw,760px);aspect-ratio:1;overflow:visible}
-.layer{position:absolute;left:50%;top:50%;width:100%;height:100%;object-fit:contain;transform:translate(-50%,-50%);will-change:transform}
-.back{width:112%;height:112%;opacity:.96}
-.middle{}
-.front{}
-.coin{position:absolute;z-index:10;left:50%;top:50%;width:25%;aspect-ratio:1;border-radius:50%;transform:translate(-50%,-50%);border:2px dashed rgba(255,255,255,.50);display:grid;place-items:center;background:rgba(0,0,0,.18);font-size:12px;letter-spacing:.14em;text-align:center}
-.note{position:fixed;z-index:20;left:12px;right:12px;top:12px;padding:10px 12px;border:1px solid #ffffff30;border-radius:12px;background:#071014cc;font-size:12px;line-height:1.4}
+html,body{margin:0;height:100%;overflow:hidden;background:#071014;font-family:Arial;color:white}
+.stage{position:relative;width:100%;height:100%;overflow:hidden;background:radial-gradient(circle,#17323a 0,#071014 50%,#030608 100%)}
+.layer{position:absolute;left:50%;top:50%;width:min(92vh,150vw);height:min(92vh,150vw);object-fit:contain;transform:translate(-50%,-50%);pointer-events:none}
+.back{width:min(103vh,168vw);height:min(103vh,168vw)}
+.coin{position:absolute;left:50%;top:50%;width:160px;height:160px;border:2px dashed #ffffff80;border-radius:50%;transform:translate(-50%,-50%);display:grid;place-items:center;text-align:center;z-index:8}
+.note{position:fixed;z-index:20;top:12px;left:12px;right:12px;background:#071014d9;border:1px solid #ffffff30;padding:10px 12px;border-radius:12px;font-size:12px}
 </style>
 </head>
 <body>
-<div class="preview">
-  <div class="note"><b>UPRIGHT PARALLAX PREVIEW</b><br>Back fills most of the view. Middle moves subtly. Front moves farther. All layers remain upright.</div>
-  <div class="stage" id="stage">
-    <img class="layer back" src="./assets/parallax/atlanta/layer-1-back.png?v=20260820-upright8">
-    <img class="layer middle" id="mid" src="./assets/parallax/atlanta/layer-2-middle.png?v=20260820-upright8">
-    <img class="layer front" id="front" src="./assets/parallax/atlanta/layer-3-front.png?v=20260820-upright8">
-    <div class="coin">PHYSICAL<br>COIN AREA</div>
-  </div>
+<div class="stage">
+<div class="note">Move your finger/mouse. The BACK stays calm, MIDDLE moves a little, FRONT moves more. All layers stay upright.</div>
+<img class="layer back" src="./assets/parallax/atlanta/layer-1-back.png?v=20260821-overlay9">
+<img id="mid" class="layer" src="./assets/parallax/atlanta/layer-2-middle.png?v=20260821-overlay9">
+<img id="front" class="layer" src="./assets/parallax/atlanta/layer-3-front.png?v=20260821-overlay9">
+<div class="coin">LIVE COIN<br>AREA</div>
 </div>
 <script>
-const mid=document.querySelector('#mid');
-const front=document.querySelector('#front');
+const mid=document.querySelector('#mid'), front=document.querySelector('#front');
 function move(x,y){
-  const dx=(x-.5), dy=(y-.5);
-  mid.style.transform=`translate(calc(-50% + ${dx*18}px),calc(-50% + ${dy*12 - 14}px))`;
-  front.style.transform=`translate(calc(-50% + ${dx*48}px),calc(-50% + ${dy*34}px)) scale(1.025)`;
+ const dx=x-.5,dy=y-.5;
+ mid.style.transform=`translate(calc(-50% + ${dx*24}px),calc(-50% + ${dy*18-16}px))`;
+ front.style.transform=`translate(calc(-50% + ${dx*70}px),calc(-50% + ${dy*50}px)) scale(1.02)`;
 }
 addEventListener('pointermove',e=>move(e.clientX/innerWidth,e.clientY/innerHeight));
-addEventListener('pointerleave',()=>move(.5,.5));
 move(.5,.5);
 </script>
-</body>
-</html>
+</body></html>
