@@ -3,30 +3,42 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>IDIS Square Parallax Asset Test</title>
+<title>IDIS Upright Parallax Preview</title>
 <style>
+*{box-sizing:border-box}
 html,body{margin:0;height:100%;background:#04090c;color:#fff;font-family:Arial,sans-serif;overflow:hidden}
-.wrap{height:100%;display:grid;place-items:center;perspective:900px}
-.stage{position:relative;width:min(86vw,86vh);height:min(86vw,86vh);transform-style:preserve-3d;transition:transform .12s ease-out}
-.layer{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;pointer-events:none}
-.back{transform:translateZ(-35px)} .middle{transform:translateZ(0)} .front{transform:translateZ(55px)}
-.info{position:fixed;left:12px;right:12px;top:12px;padding:10px 12px;border:1px solid #ffffff30;border-radius:12px;background:#071014cc;z-index:5;font-size:12px}
+.preview{position:relative;width:100%;height:100%;display:grid;place-items:center;background:
+radial-gradient(circle at 50% 50%,#123039 0,#071014 38%,#030608 78%)}
+.stage{position:relative;width:min(96vw,760px);aspect-ratio:1;overflow:visible}
+.layer{position:absolute;left:50%;top:50%;width:100%;height:100%;object-fit:contain;transform:translate(-50%,-50%);will-change:transform}
+.back{width:112%;height:112%;opacity:.96}
+.middle{}
+.front{}
+.coin{position:absolute;z-index:10;left:50%;top:50%;width:25%;aspect-ratio:1;border-radius:50%;transform:translate(-50%,-50%);border:2px dashed rgba(255,255,255,.50);display:grid;place-items:center;background:rgba(0,0,0,.18);font-size:12px;letter-spacing:.14em;text-align:center}
+.note{position:fixed;z-index:20;left:12px;right:12px;top:12px;padding:10px 12px;border:1px solid #ffffff30;border-radius:12px;background:#071014cc;font-size:12px;line-height:1.4}
 </style>
 </head>
 <body>
-<div class="info">SQUARE PARALLAX ASSET TEST • move your finger or mouse. If you see three square demo layers, the PNG paths are correct.</div>
-<div class="wrap">
+<div class="preview">
+  <div class="note"><b>UPRIGHT PARALLAX PREVIEW</b><br>Back fills most of the view. Middle moves subtly. Front moves farther. All layers remain upright.</div>
   <div class="stage" id="stage">
-    <img class="layer back" src="./assets/parallax/atlanta/layer-1-back.png?v=20260820-depth7">
-    <img class="layer middle" src="./assets/parallax/atlanta/layer-2-middle.png?v=20260820-depth7">
-    <img class="layer front" src="./assets/parallax/atlanta/layer-3-front.png?v=20260820-depth7">
+    <img class="layer back" src="./assets/parallax/atlanta/layer-1-back.png?v=20260820-upright8">
+    <img class="layer middle" id="mid" src="./assets/parallax/atlanta/layer-2-middle.png?v=20260820-upright8">
+    <img class="layer front" id="front" src="./assets/parallax/atlanta/layer-3-front.png?v=20260820-upright8">
+    <div class="coin">PHYSICAL<br>COIN AREA</div>
   </div>
 </div>
 <script>
-const s=document.querySelector('#stage');
-function move(x,y){const rx=(.5-y)*8,ry=(x-.5)*8;s.style.transform=`rotateX(${rx}deg) rotateY(${ry}deg)`;}
+const mid=document.querySelector('#mid');
+const front=document.querySelector('#front');
+function move(x,y){
+  const dx=(x-.5), dy=(y-.5);
+  mid.style.transform=`translate(calc(-50% + ${dx*18}px),calc(-50% + ${dy*12 - 14}px))`;
+  front.style.transform=`translate(calc(-50% + ${dx*48}px),calc(-50% + ${dy*34}px)) scale(1.025)`;
+}
 addEventListener('pointermove',e=>move(e.clientX/innerWidth,e.clientY/innerHeight));
-addEventListener('pointerleave',()=>s.style.transform='');
+addEventListener('pointerleave',()=>move(.5,.5));
+move(.5,.5);
 </script>
 </body>
 </html>

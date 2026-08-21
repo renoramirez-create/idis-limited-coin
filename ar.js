@@ -451,6 +451,7 @@ document.addEventListener('DOMContentLoaded', () => {
   let sessionToken = 0;
   let active = false;
   let cameraObserver = null;
+  let currentVisibleSide = null;
   const foundTargets = new Set();
   const lossTimers = new Map();
 
@@ -459,6 +460,19 @@ document.addEventListener('DOMContentLoaded', () => {
   function setARUI(show) {
     [header, footer, status, guide].forEach(el => el && el.classList.toggle('hidden', !show));
     if (!show && sideChip) sideChip.classList.add('hidden');
+  }
+
+  function showScanUI(text = 'LOOK FOR THE COIN') {
+    status.classList.remove('hidden', 'error', 'locked');
+    guide.classList.remove('hidden');
+    sideChip.classList.add('hidden');
+    statusCopy.textContent = text;
+  }
+
+  function hideScanUI() {
+    guide.classList.add('hidden');
+    status.classList.add('hidden');
+    sideChip.classList.add('hidden');
   }
 
   function showError(title, copy, statusText = 'AR ERROR') {
@@ -624,10 +638,9 @@ document.addEventListener('DOMContentLoaded', () => {
       }
 
       intro.classList.add('hidden');
+      currentVisibleSide = null;
       setARUI(true);
-      status.classList.remove('hidden');
-      guide.classList.remove('hidden');
-      statusCopy.textContent = 'STARTING CAMERA';
+      showScanUI('STARTING CAMERA');
       hideAllExperienceRoots();
       watchForCameraVideo();
 
@@ -658,7 +671,7 @@ document.addEventListener('DOMContentLoaded', () => {
       [50, 200, 500, 1000, 1800].forEach(delay => setTimeout(() => {
         if (active && myToken === sessionToken) styleCameraVideos();
       }, delay));
-      statusCopy.textContent = 'LOOK FOR THE COIN';
+      showScanUI('LOOK FOR THE COIN');
     } catch (error) {
       console.error('AR start failed:', error);
       if (error && error.code === 'HTTPS_REQUIRED') {
@@ -682,6 +695,7 @@ document.addEventListener('DOMContentLoaded', () => {
     ++sessionToken; // invalidates any in-flight start()
     active = false;
     starting = false;
+    currentVisibleSide = null;
     foundTargets.clear();
     lossTimers.forEach(timer => clearTimeout(timer));
     lossTimers.clear();
@@ -697,14 +711,29 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Defensive cleanup for browsers that keep a MediaStream alive after stop.
     stopAllCameraTracks();
-    status.classList.remove('locked', 'error');
+
+    // Hard-reset the visual state so the next session always starts clean.
+    status.classList.remove('locked', 'error', 'hidden');
+    guide.classList.remove('hidden');
     sideChip.classList.add('hidden');
+    statusCopy.textContent = 'START AR EXPERIENCE';
     hideAllExperienceRoots();
+
+    [atlantaTarget, idisTarget].forEach((target) => {
+      if (target && target.object3D) target.object3D.visible = false;
+    });
+
     setARUI(false);
     intro.classList.remove('hidden');
   }
 
   function getExperienceRoot(target) {
+    // The Atlanta parallax root is attached directly to the scene so it can
+    // remain screen-upright instead of inheriting the coin's rotation.
+    if (target === atlantaTarget) {
+      const parallax = getParallaxComponent();
+      if (parallax && parallax.root) return parallax.root;
+    }
     return target ? target.querySelector('.experience-root') : null;
   }
 
@@ -713,6 +742,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function hideAllExperienceRoots() {
+    currentVisibleSide = null;
     const parallax = getParallaxComponent();
     if (parallax) parallax.reset();
 
@@ -729,23 +759,33 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function revealTarget(target, side, statusLabel) {
+    if (!active) return;
+
     clearLossTimer(side);
     clearLossTimer(side === 'atlanta' ? 'idis' : 'atlanta');
 
+    // Ignore repeated found events for the same side to prevent blinking/restarting.
+    if (currentVisibleSide === side && foundTargets.has(side)) return;
+
     foundTargets.clear();
     foundTargets.add(side);
+    currentVisibleSide = side;
+
     status.classList.remove('error');
     status.classList.add('locked');
     statusCopy.textContent = statusLabel;
 
     // Clean two-state UI: either scan guidance OR AR artwork, never both.
-    guide.classList.add('hidden');
-    status.classList.add('hidden');
-    sideChip.classList.add('hidden');
+    hideScanUI();
 
     const currentRoot = getExperienceRoot(target);
     const otherRoot = side === 'atlanta' ? getExperienceRoot(idisTarget) : getExperienceRoot(atlantaTarget);
     if (otherRoot) otherRoot.setAttribute('visible', 'false');
+
+    if (side !== 'atlanta') {
+      const atlantaParallax = getParallaxComponent();
+      if (atlantaParallax) atlantaParallax.reset();
+    }
 
     if (side === 'atlanta') {
       const parallax = getParallaxComponent();
@@ -770,7 +810,6 @@ document.addEventListener('DOMContentLoaded', () => {
   function loseTarget(side) {
     clearLossTimer(side);
 
-    // Short debounce prevents one weak reflective frame from making the scene blink.
     const timer = setTimeout(() => {
       lossTimers.delete(side);
       foundTargets.delete(side);
@@ -779,20 +818,17 @@ document.addEventListener('DOMContentLoaded', () => {
         const parallax = getParallaxComponent();
         if (parallax) parallax.reset();
       } else {
-        const target = idisTarget;
-        const root = getExperienceRoot(target);
+        const root = getExperienceRoot(idisTarget);
         if (root) root.setAttribute('visible', 'false');
       }
 
+      if (currentVisibleSide === side) currentVisibleSide = null;
+
       if (foundTargets.size === 0) {
         hideAllExperienceRoots();
-        status.classList.remove('locked');
-        status.classList.remove('hidden');
-        statusCopy.textContent = 'LOOK FOR THE COIN';
-        guide.classList.remove('hidden');
-        sideChip.classList.add('hidden');
+        showScanUI('LOOK FOR THE COIN');
       }
-    }, 260);
+    }, 380);
 
     lossTimers.set(side, timer);
   }
@@ -811,7 +847,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!active && !starting) return;
     styleCameraVideos();
     status.classList.remove('error');
-    if (foundTargets.size === 0) statusCopy.textContent = 'LOOK FOR THE COIN';
+    if (foundTargets.size === 0 && !currentVisibleSide) showScanUI('LOOK FOR THE COIN');
   });
 
   scene.addEventListener('arError', event => {
@@ -831,8 +867,9 @@ document.addEventListener('DOMContentLoaded', () => {
   // pointerup makes the close control responsive on phones even if a canvas is
   // doing pointer handling. click is kept as a keyboard/mouse fallback.
   closeButton.addEventListener('pointerup', stopAR, { passive: false });
+  closeButton.addEventListener('touchend', stopAR, { passive: false });
   closeButton.addEventListener('click', event => {
-    if (event.detail === 0) stopAR(event); // keyboard activation only
+    stopAR(event);
   });
   errorClose.addEventListener('click', () => hideError());
 
