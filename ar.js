@@ -465,6 +465,12 @@ document.addEventListener('DOMContentLoaded', () => {
   const presentationUI = document.querySelector('#presentation-ui');
   const presentationSeconds = document.querySelector('#presentation-seconds');
 
+  const idisCinematic = document.querySelector('#idis-cinematic');
+  const idisShowcaseVideo = document.querySelector('#idis-showcase-video');
+  const idisFeatureOverlay = document.querySelector('#idis-feature-overlay');
+  const idisFeatureLogo = document.querySelector('#idis-feature-logo');
+  const idisFeatureVideo = document.querySelector('#idis-feature-video');
+
   const guestNameInput = document.querySelector('#guest-name');
   const guestNameField = document.querySelector('.guest-name-field');
 
@@ -474,8 +480,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const TARGET_FILE = './assets/targets/gsx2026-two-sided.mind';
 
-  const PRESENTATION_MS = 30000;
+  const PRESENTATION_MS = 30000; // Atlanta keeps the 30-second interactive timer.
   const HOME_DELAY_MS = 3000;
+
+  // IDIS is now media-driven.
+  const IDIS_LOGO_TO_FEATURE_DELAY_MS = 850;
+  const IDIS_CINEMATIC_EXIT_MS = 620;
 
   const END_CARD_MS = 6000;
   const END_CARD_FADE_OUT_MS = 900;
@@ -515,7 +525,15 @@ document.addEventListener('DOMContentLoaded', () => {
   const OPPOSITE_FACE_HOLD_MS = 220;
 
   // IDIS detached/frozen presentation.
+  // Kept for cleanup compatibility, but the IDIS face now uses the
+  // cinematic video sequence instead of the old 30-second hologram.
   let idisPresentationGroup = null;
+
+  // IDIS cinematic sequence.
+  let idisFeatureStartTimer = null;
+  let idisCinematicExitTimer = null;
+  let idisSequenceActive = false;
+  let idisSequencePhase = 'idle';
 
   // Gesture state shared by both scenes.
   const pointers = new Map();
@@ -542,12 +560,20 @@ document.addEventListener('DOMContentLoaded', () => {
   let motionTiltEnabled = false;
   let motionPermissionAttempted = false;
 
-  // Latest SCREEN-RELATIVE sensor values. These continue updating even
-  // while the scanner is waiting for the next coin, so subsequent scans
-  // can immediately establish a fresh neutral position.
-  let motionSampleReady = false;
-  let rawPhoneTiltLR = 0; // left / right
-  let rawPhoneTiltUD = 0; // up / down
+  // DeviceOrientation is preferred for left/right because gamma is very
+  // responsive. DeviceMotion gravity is preferred for up/down because it is
+  // much more reliable when the phone is held upright.
+  let orientationListenerEnabled = false;
+  let motionListenerEnabled = false;
+
+  let orientationSampleReady = false;
+  let gravitySampleReady = false;
+
+  let rawOrientationLR = 0;
+  let rawOrientationUDFallback = 0;
+
+  let rawGravityLR = 0;
+  let rawGravityUD = 0;
 
   let smoothPhoneTiltLR = 0;
   let smoothPhoneTiltUD = 0;
@@ -557,12 +583,16 @@ document.addEventListener('DOMContentLoaded', () => {
   let phoneTiltNeutralCaptured = false;
   let phoneTiltNeutralPending = true;
 
-  // Sensor delta and visual scene limits.
+  // Track which source is currently driving each axis. If a better sensor
+  // becomes available mid-scene, that axis is re-zeroed to prevent a jump.
+  let activeLRSource = 'none';
+  let activeUDSource = 'none';
+
   const PHONE_TILT_INPUT_LIMIT_LR = 30;
-  const PHONE_TILT_INPUT_LIMIT_UD = 30;
+  const PHONE_TILT_INPUT_LIMIT_UD = 28;
 
   const PHONE_TILT_SCENE_LIMIT_LR = 6.5;
-  const PHONE_TILT_SCENE_LIMIT_UD = 5.5;
+  const PHONE_TILT_SCENE_LIMIT_UD = 7.0;
 
   const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
   const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
@@ -572,17 +602,18 @@ document.addEventListener('DOMContentLoaded', () => {
   /* ------------------------------------------------------------------------
      PHONE MOTION TILT
 
-     Uses DeviceOrientation beta + gamma.
+     LEFT / RIGHT:
+       DeviceOrientation gamma, screen-remapped.
+       Falls back to gravity roll if orientation data is unavailable.
 
-     gamma = left/right device tilt
-     beta  = front/back device tilt
+     UP / DOWN:
+       DeviceMotion accelerationIncludingGravity.
+       We calculate the angle of the screen normal against gravity. This is
+       much more reliable than beta for a phone held vertically.
+       Falls back to DeviceOrientation beta when gravity is unavailable.
 
-     The values are remapped into SCREEN coordinates so portrait and landscape
-     orientations behave consistently.
-
-     Most importantly, sensor samples remain live between coin scans. When a
-     new coin scene begins we immediately capture the CURRENT sensor sample as
-     neutral instead of clearing the values and waiting for a new event.
+     Sensor streams remain active between scans. Every new coin scene captures
+     a fresh neutral point from the latest live sensor values.
   ------------------------------------------------------------------------ */
 
   function normalizeScreenAngle(value) {
@@ -614,7 +645,6 @@ document.addEventListener('DOMContentLoaded', () => {
   function mapDeviceTiltToScreen(beta, gamma) {
     const angle = getScreenOrientationAngle();
 
-    // Convert beta/gamma to axes relative to what the visitor sees on screen.
     switch (angle) {
       case 90:
         return {
@@ -643,6 +673,61 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
+  function mapGravityToScreen(x, y, z) {
+    const angle = getScreenOrientationAngle();
+
+    let sx = x;
+    let sy = y;
+
+    // Rotate device X/Y into screen-relative horizontal/vertical axes.
+    switch (angle) {
+      case 90:
+        sx = -y;
+        sy = x;
+        break;
+
+      case 180:
+        sx = -x;
+        sy = -y;
+        break;
+
+      case 270:
+        sx = y;
+        sy = -x;
+        break;
+
+      case 0:
+      default:
+        sx = x;
+        sy = y;
+        break;
+    }
+
+    const horizontalDenominator =
+      Math.max(0.001, Math.sqrt(sy * sy + z * z));
+
+    const normalDenominator =
+      Math.max(0.001, Math.sqrt(sx * sx + sy * sy));
+
+    // Roll around the screen's vertical axis, useful as LR fallback.
+    const leftRight =
+      THREE.MathUtils.radToDeg(
+        Math.atan2(sx, horizontalDenominator)
+      );
+
+    // Screen-normal pitch. At an upright neutral phone z is near zero.
+    // Tipping the top of the phone toward/away changes z strongly.
+    const upDown =
+      THREE.MathUtils.radToDeg(
+        Math.atan2(z, normalDenominator)
+      );
+
+    return {
+      leftRight,
+      upDown
+    };
+  }
+
   function shortestAngleDelta(current, neutral) {
     let delta = current - neutral;
 
@@ -652,6 +737,38 @@ document.addEventListener('DOMContentLoaded', () => {
     return delta;
   }
 
+  function getCurrentTiltSources() {
+    return {
+      lrSource:
+        orientationSampleReady
+          ? 'orientation'
+          : gravitySampleReady
+            ? 'gravity'
+            : 'none',
+
+      udSource:
+        gravitySampleReady
+          ? 'gravity'
+          : orientationSampleReady
+            ? 'orientation'
+            : 'none',
+
+      leftRight:
+        orientationSampleReady
+          ? rawOrientationLR
+          : gravitySampleReady
+            ? rawGravityLR
+            : 0,
+
+      upDown:
+        gravitySampleReady
+          ? rawGravityUD
+          : orientationSampleReady
+            ? rawOrientationUDFallback
+            : 0
+    };
+  }
+
   function capturePhoneTiltNeutral() {
     if (!motionTiltEnabled) {
       phoneTiltNeutralCaptured = false;
@@ -659,20 +776,52 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    if (!motionSampleReady) {
+    const sources = getCurrentTiltSources();
+
+    if (
+      sources.lrSource === 'none' ||
+      sources.udSource === 'none'
+    ) {
       phoneTiltNeutralCaptured = false;
       phoneTiltNeutralPending = true;
       return;
     }
 
-    phoneTiltNeutralLR = rawPhoneTiltLR;
-    phoneTiltNeutralUD = rawPhoneTiltUD;
+    activeLRSource = sources.lrSource;
+    activeUDSource = sources.udSource;
 
-    smoothPhoneTiltLR = rawPhoneTiltLR;
-    smoothPhoneTiltUD = rawPhoneTiltUD;
+    phoneTiltNeutralLR = sources.leftRight;
+    phoneTiltNeutralUD = sources.upDown;
+
+    smoothPhoneTiltLR = sources.leftRight;
+    smoothPhoneTiltUD = sources.upDown;
 
     phoneTiltNeutralCaptured = true;
     phoneTiltNeutralPending = false;
+  }
+
+  function rezeroAxisIfSourceChanged() {
+    if (!phoneTiltNeutralCaptured) return;
+
+    const sources = getCurrentTiltSources();
+
+    if (
+      sources.lrSource !== 'none' &&
+      sources.lrSource !== activeLRSource
+    ) {
+      activeLRSource = sources.lrSource;
+      phoneTiltNeutralLR = sources.leftRight;
+      smoothPhoneTiltLR = sources.leftRight;
+    }
+
+    if (
+      sources.udSource !== 'none' &&
+      sources.udSource !== activeUDSource
+    ) {
+      activeUDSource = sources.udSource;
+      phoneTiltNeutralUD = sources.upDown;
+      smoothPhoneTiltUD = sources.upDown;
+    }
   }
 
   function handleDeviceOrientation(event) {
@@ -685,64 +834,182 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    const mapped = mapDeviceTiltToScreen(beta, gamma);
+    const mapped =
+      mapDeviceTiltToScreen(beta, gamma);
 
-    rawPhoneTiltLR = mapped.leftRight;
-    rawPhoneTiltUD = mapped.upDown;
-    motionSampleReady = true;
+    rawOrientationLR = mapped.leftRight;
+    rawOrientationUDFallback = mapped.upDown;
+    orientationSampleReady = true;
 
-    // If a new presentation began before the first sensor event arrived,
-    // establish neutral on this first valid sample.
     if (phoneTiltNeutralPending || !phoneTiltNeutralCaptured) {
       capturePhoneTiltNeutral();
+    } else {
+      rezeroAxisIfSourceChanged();
+    }
+  }
+
+  function handleDeviceMotion(event) {
+    if (!motionTiltEnabled) return;
+
+    const gravity =
+      event.accelerationIncludingGravity;
+
+    if (!gravity) return;
+
+    const x = Number(gravity.x);
+    const y = Number(gravity.y);
+    const z = Number(gravity.z);
+
+    if (
+      !Number.isFinite(x) ||
+      !Number.isFinite(y) ||
+      !Number.isFinite(z)
+    ) {
+      return;
+    }
+
+    const mapped =
+      mapGravityToScreen(x, y, z);
+
+    rawGravityLR = mapped.leftRight;
+    rawGravityUD = mapped.upDown;
+    gravitySampleReady = true;
+
+    if (phoneTiltNeutralPending || !phoneTiltNeutralCaptured) {
+      capturePhoneTiltNeutral();
+    } else {
+      // Gravity becoming available upgrades up/down from beta to the
+      // accelerometer without making the scene jump.
+      rezeroAxisIfSourceChanged();
     }
   }
 
   function resetPhoneTiltNeutral() {
-    // DO NOT erase raw sensor values. Keeping the latest sample is what fixes
-    // tilt after the second, third, fourth coin scan.
+    // Keep all live raw samples. Re-zero instantly from the newest values.
     phoneTiltNeutralCaptured = false;
     phoneTiltNeutralPending = true;
+    activeLRSource = 'none';
+    activeUDSource = 'none';
 
     capturePhoneTiltNeutral();
   }
 
   function handleScreenOrientationChange() {
-    // The beta/gamma axes remap after portrait/landscape rotation.
-    // Re-zero on the next live sample so the scene does not jump.
+    // Sensor axes have changed relative to the visible screen.
     phoneTiltNeutralCaptured = false;
     phoneTiltNeutralPending = true;
+    activeLRSource = 'none';
+    activeUDSource = 'none';
   }
 
   async function enablePhoneTilt() {
     if (motionTiltEnabled) return true;
 
-    if (
-      typeof window.DeviceOrientationEvent === 'undefined'
-    ) {
+    const hasOrientation =
+      typeof window.DeviceOrientationEvent !== 'undefined';
+
+    const hasMotion =
+      typeof window.DeviceMotionEvent !== 'undefined';
+
+    if (!hasOrientation && !hasMotion) {
       return false;
     }
 
     motionPermissionAttempted = true;
 
     try {
-      // iOS 13+ requires this inside a user gesture.
+      // Invoke both permission functions before awaiting so iOS sees both
+      // requests as part of the same Start AR user gesture.
+      const permissionChecks = [];
+
       if (
+        hasOrientation &&
         typeof DeviceOrientationEvent.requestPermission === 'function'
       ) {
-        const result =
-          await DeviceOrientationEvent.requestPermission();
-
-        if (result !== 'granted') {
-          return false;
-        }
+        permissionChecks.push(
+          DeviceOrientationEvent.requestPermission()
+            .then(value => ({
+              type: 'orientation',
+              granted: value === 'granted'
+            }))
+            .catch(() => ({
+              type: 'orientation',
+              granted: false
+            }))
+        );
+      } else if (hasOrientation) {
+        permissionChecks.push(
+          Promise.resolve({
+            type: 'orientation',
+            granted: true
+          })
+        );
       }
 
-      window.addEventListener(
-        'deviceorientation',
-        handleDeviceOrientation,
-        true
-      );
+      if (
+        hasMotion &&
+        typeof DeviceMotionEvent.requestPermission === 'function'
+      ) {
+        permissionChecks.push(
+          DeviceMotionEvent.requestPermission()
+            .then(value => ({
+              type: 'motion',
+              granted: value === 'granted'
+            }))
+            .catch(() => ({
+              type: 'motion',
+              granted: false
+            }))
+        );
+      } else if (hasMotion) {
+        permissionChecks.push(
+          Promise.resolve({
+            type: 'motion',
+            granted: true
+          })
+        );
+      }
+
+      const results =
+        await Promise.all(permissionChecks);
+
+      const orientationGranted =
+        results.some(
+          item =>
+            item.type === 'orientation' &&
+            item.granted
+        );
+
+      const motionGranted =
+        results.some(
+          item =>
+            item.type === 'motion' &&
+            item.granted
+        );
+
+      if (orientationGranted) {
+        window.addEventListener(
+          'deviceorientation',
+          handleDeviceOrientation,
+          true
+        );
+
+        orientationListenerEnabled = true;
+      }
+
+      if (motionGranted) {
+        window.addEventListener(
+          'devicemotion',
+          handleDeviceMotion,
+          true
+        );
+
+        motionListenerEnabled = true;
+      }
+
+      if (!orientationGranted && !motionGranted) {
+        return false;
+      }
 
       window.addEventListener(
         'orientationchange',
@@ -762,71 +1029,98 @@ document.addEventListener('DOMContentLoaded', () => {
 
       motionTiltEnabled = true;
 
-      // Preserve any sample collected in this session and establish neutral
-      // as soon as possible.
+      orientationSampleReady = false;
+      gravitySampleReady = false;
+
       resetPhoneTiltNeutral();
 
       return true;
     } catch (error) {
-      console.warn('Phone motion permission unavailable:', error);
+      console.warn(
+        'Phone motion permission unavailable:',
+        error
+      );
+
       return false;
     }
   }
 
   function disablePhoneTilt() {
-    if (motionTiltEnabled) {
+    if (orientationListenerEnabled) {
       window.removeEventListener(
         'deviceorientation',
         handleDeviceOrientation,
         true
       );
-
-      window.removeEventListener(
-        'orientationchange',
-        handleScreenOrientationChange,
-        true
-      );
-
-      if (
-        screen.orientation &&
-        typeof screen.orientation.removeEventListener === 'function'
-      ) {
-        screen.orientation.removeEventListener(
-          'change',
-          handleScreenOrientationChange
-        );
-      }
     }
 
+    if (motionListenerEnabled) {
+      window.removeEventListener(
+        'devicemotion',
+        handleDeviceMotion,
+        true
+      );
+    }
+
+    window.removeEventListener(
+      'orientationchange',
+      handleScreenOrientationChange,
+      true
+    );
+
+    if (
+      screen.orientation &&
+      typeof screen.orientation.removeEventListener === 'function'
+    ) {
+      screen.orientation.removeEventListener(
+        'change',
+        handleScreenOrientationChange
+      );
+    }
+
+    orientationListenerEnabled = false;
+    motionListenerEnabled = false;
     motionTiltEnabled = false;
 
-    // Keep the last values only as harmless state, but require a fresh
-    // sample when motion is enabled again.
-    motionSampleReady = false;
+    orientationSampleReady = false;
+    gravitySampleReady = false;
+
     phoneTiltNeutralCaptured = false;
     phoneTiltNeutralPending = true;
+
+    activeLRSource = 'none';
+    activeUDSource = 'none';
   }
 
   function updatePhoneTilt() {
     if (
       !motionTiltEnabled ||
-      !motionSampleReady ||
       !phoneTiltNeutralCaptured
     ) {
       return { x: 0, y: 0 };
     }
 
-    // Smooth both axes independently.
+    const sources = getCurrentTiltSources();
+
+    if (
+      sources.lrSource === 'none' ||
+      sources.udSource === 'none'
+    ) {
+      return { x: 0, y: 0 };
+    }
+
+    rezeroAxisIfSourceChanged();
+
     smoothPhoneTiltLR = lerp(
       smoothPhoneTiltLR,
-      rawPhoneTiltLR,
-      0.095
+      sources.leftRight,
+      0.10
     );
 
     smoothPhoneTiltUD = lerp(
       smoothPhoneTiltUD,
-      rawPhoneTiltUD,
-      0.095
+      sources.upDown,
+      0.085
     );
 
     const deltaLR = clamp(
@@ -854,9 +1148,6 @@ document.addEventListener('DOMContentLoaded', () => {
       PHONE_TILT_SCENE_LIMIT_LR
     );
 
-    // Negative converts the physical screen pitch into a natural CSS
-    // perspective response: tilt the top of the phone away and the virtual
-    // scene follows that perspective.
     const upDown = clamp(
       -(deltaUD / PHONE_TILT_INPUT_LIMIT_UD) *
         PHONE_TILT_SCENE_LIMIT_UD,
@@ -865,8 +1156,8 @@ document.addEventListener('DOMContentLoaded', () => {
     );
 
     return {
-      x: upDown,     // rotateX
-      y: leftRight  // rotateY
+      x: upDown,
+      y: leftRight
     };
   }
 
@@ -1407,6 +1698,287 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   /* ------------------------------------------------------------------------
+     IDIS CINEMATIC SEQUENCE
+  ------------------------------------------------------------------------ */
+
+  function prepareIDISCinematicVideo(video) {
+    if (!video) return;
+
+    video.muted = true;
+    video.defaultMuted = true;
+    video.playsInline = true;
+    video.setAttribute('playsinline', '');
+    video.setAttribute('webkit-playsinline', '');
+  }
+
+  function safeResetIDISVideo(video) {
+    if (!video) return;
+
+    try { video.pause(); } catch (_) {}
+
+    try {
+      video.currentTime = 0;
+    } catch (_) {}
+  }
+
+  function clearIDISCinematicTimers() {
+    if (idisFeatureStartTimer) {
+      clearTimeout(idisFeatureStartTimer);
+      idisFeatureStartTimer = null;
+    }
+
+    if (idisCinematicExitTimer) {
+      clearTimeout(idisCinematicExitTimer);
+      idisCinematicExitTimer = null;
+    }
+  }
+
+  function resetIDISCinematicSequence() {
+    clearIDISCinematicTimers();
+
+    idisSequenceActive = false;
+    idisSequencePhase = 'idle';
+
+    if (idisShowcaseVideo) {
+      idisShowcaseVideo.classList.remove(
+        'is-entering',
+        'is-frozen'
+      );
+      idisShowcaseVideo.classList.add('cinematic-hidden');
+      safeResetIDISVideo(idisShowcaseVideo);
+    }
+
+    if (idisFeatureOverlay) {
+      idisFeatureOverlay.classList.remove(
+        'logo-in',
+        'video-in'
+      );
+      idisFeatureOverlay.classList.add('cinematic-hidden');
+      idisFeatureOverlay.setAttribute('aria-hidden', 'true');
+    }
+
+    safeResetIDISVideo(idisFeatureVideo);
+
+    if (idisCinematic) {
+      idisCinematic.classList.remove('cinematic-exit');
+      idisCinematic.classList.add('cinematic-hidden');
+      idisCinematic.setAttribute('aria-hidden', 'true');
+    }
+  }
+
+  function playIDISVideo(video) {
+    if (!video) {
+      return Promise.reject(
+        new Error('IDIS_VIDEO_ELEMENT_MISSING')
+      );
+    }
+
+    prepareIDISCinematicVideo(video);
+
+    const promise = video.play();
+
+    return promise &&
+      typeof promise.then === 'function'
+      ? promise
+      : Promise.resolve();
+  }
+
+  function showIDISCinematicShell() {
+    if (!idisCinematic) return;
+
+    idisCinematic.classList.remove(
+      'cinematic-hidden',
+      'cinematic-exit'
+    );
+
+    idisCinematic.setAttribute('aria-hidden', 'false');
+  }
+
+  function startIDISShowcaseVideo() {
+    if (
+      !active ||
+      currentSide !== 'idis' ||
+      !idisSequenceActive
+    ) {
+      return;
+    }
+
+    idisSequencePhase = 'showcase';
+    showIDISCinematicShell();
+
+    if (!idisShowcaseVideo) {
+      launchIDISFeatureSegment();
+      return;
+    }
+
+    idisShowcaseVideo.classList.remove(
+      'cinematic-hidden',
+      'is-frozen',
+      'is-entering'
+    );
+
+    safeResetIDISVideo(idisShowcaseVideo);
+
+    void idisShowcaseVideo.offsetWidth;
+    idisShowcaseVideo.classList.add('is-entering');
+
+    playIDISVideo(idisShowcaseVideo).catch(error => {
+      console.warn(
+        'IDIS transparent showcase could not play:',
+        error
+      );
+
+      launchIDISFeatureSegment();
+    });
+  }
+
+  function freezeIDISShowcaseFinalFrame() {
+    if (!idisShowcaseVideo) return;
+
+    try { idisShowcaseVideo.pause(); } catch (_) {}
+
+    // Keep the final image on screen. Seeking just before duration prevents
+    // black-frame behavior on some mobile browsers.
+    try {
+      if (
+        Number.isFinite(idisShowcaseVideo.duration) &&
+        idisShowcaseVideo.duration > 0.08
+      ) {
+        idisShowcaseVideo.currentTime =
+          Math.max(
+            0,
+            idisShowcaseVideo.duration - 0.04
+          );
+      }
+    } catch (_) {}
+
+    idisShowcaseVideo.classList.remove('is-entering');
+    idisShowcaseVideo.classList.remove('cinematic-hidden');
+    idisShowcaseVideo.classList.add('is-frozen');
+  }
+
+  function launchIDISFeatureSegment() {
+    if (
+      !active ||
+      currentSide !== 'idis' ||
+      !idisSequenceActive
+    ) {
+      return;
+    }
+
+    idisSequencePhase = 'logo';
+    showIDISCinematicShell();
+
+    if (idisFeatureOverlay) {
+      idisFeatureOverlay.classList.remove(
+        'cinematic-hidden',
+        'logo-in',
+        'video-in'
+      );
+
+      idisFeatureOverlay.setAttribute('aria-hidden', 'false');
+
+      void idisFeatureOverlay.offsetWidth;
+      idisFeatureOverlay.classList.add('logo-in');
+    }
+
+    idisFeatureStartTimer = setTimeout(() => {
+      idisFeatureStartTimer = null;
+
+      if (
+        !active ||
+        currentSide !== 'idis' ||
+        !idisSequenceActive
+      ) {
+        return;
+      }
+
+      idisSequencePhase = 'feature';
+
+      if (idisFeatureOverlay) {
+        idisFeatureOverlay.classList.add('video-in');
+      }
+
+      safeResetIDISVideo(idisFeatureVideo);
+
+      playIDISVideo(idisFeatureVideo).catch(error => {
+        console.warn(
+          'IDIS 15-second feature video could not play:',
+          error
+        );
+
+        finishIDISCinematicSequence();
+      });
+    }, IDIS_LOGO_TO_FEATURE_DELAY_MS);
+  }
+
+  function handleIDISShowcaseEnded() {
+    if (
+      !idisSequenceActive ||
+      currentSide !== 'idis'
+    ) {
+      return;
+    }
+
+    freezeIDISShowcaseFinalFrame();
+    launchIDISFeatureSegment();
+  }
+
+  function handleIDISFeatureEnded() {
+    if (
+      !idisSequenceActive ||
+      currentSide !== 'idis'
+    ) {
+      return;
+    }
+
+    try { idisFeatureVideo.pause(); } catch (_) {}
+    finishIDISCinematicSequence();
+  }
+
+  function finishIDISCinematicSequence() {
+    if (!idisSequenceActive) return;
+
+    idisSequencePhase = 'exiting';
+    hidePresentationControls();
+
+    if (idisCinematic) {
+      idisCinematic.classList.add('cinematic-exit');
+    }
+
+    idisCinematicExitTimer = setTimeout(() => {
+      idisCinematicExitTimer = null;
+
+      if (!active) return;
+
+      clearPresentationTimer();
+      hidePresentationControls();
+
+      currentSide = null;
+      oppositeVisibleSince = 0;
+      resetGestureState();
+
+      // Now that the cinematic fade has completed, remove all IDIS media.
+      resetIDISCinematicSequence();
+
+      hideScanUI();
+      showEndCard();
+    }, IDIS_CINEMATIC_EXIT_MS);
+  }
+
+  function startIDISCinematicSequence() {
+    resetIDISCinematicSequence();
+
+    idisSequenceActive = true;
+    idisSequencePhase = 'showcase';
+
+    prepareIDISCinematicVideo(idisShowcaseVideo);
+    prepareIDISCinematicVideo(idisFeatureVideo);
+
+    startIDISShowcaseVideo();
+  }
+
+  /* ------------------------------------------------------------------------
      IDIS SIDE: DETACHED FROM TRACKING AFTER RECOGNITION
 
      We clone the already-built IDIS hologram object tree into the scene.
@@ -1415,6 +1987,8 @@ document.addEventListener('DOMContentLoaded', () => {
   ------------------------------------------------------------------------ */
 
   function removeIDISPresentation() {
+    resetIDISCinematicSequence();
+
     if (idisPresentationGroup && idisPresentationGroup.parent) {
       idisPresentationGroup.parent.remove(idisPresentationGroup);
     }
@@ -1956,12 +2530,15 @@ document.addEventListener('DOMContentLoaded', () => {
       requestAnimationFrame(updateCountdown);
   }
 
-  function hideAllPresentations() {
+  function hideAllPresentations(options = {}) {
     cancelAnimationFrame(presentationRAF);
     presentationRAF = 0;
 
     hideAtlantaPresentation();
-    removeIDISPresentation();
+
+    if (!options.keepIDISCinematic) {
+      removeIDISPresentation();
+    }
   }
 
   function finishEndCardToScan() {
@@ -1970,6 +2547,14 @@ document.addEventListener('DOMContentLoaded', () => {
     currentSide = null;
     oppositeVisibleSince = 0;
     resetGestureState();
+
+    const timerChip =
+      presentationSeconds &&
+      presentationSeconds.closest('.presentation-timer');
+
+    if (timerChip) {
+      timerChip.style.display = '';
+    }
 
     // Camera + MindAR stay live underneath.
     setARUI(true);
@@ -2016,14 +2601,30 @@ document.addEventListener('DOMContentLoaded', () => {
     hideScanUI();
     showPresentationControls();
 
-    if (side === 'atlanta') {
-      showAtlantaPresentation();
-    } else {
-      showIDISPresentation();
-      renderPresentation();
-    }
+    const timerChip =
+      presentationSeconds &&
+      presentationSeconds.closest('.presentation-timer');
 
-    startPresentationTimer();
+    if (side === 'atlanta') {
+      // Atlanta remains the existing 30-second interactive experience.
+      if (timerChip) {
+        timerChip.style.display = '';
+      }
+
+      showAtlantaPresentation();
+      startPresentationTimer();
+    } else {
+      // IDIS duration is driven by its media sequence.
+      clearPresentationTimer();
+
+      if (timerChip) {
+        timerChip.style.display = 'none';
+      }
+
+      // Hide the old target-attached hologram and run the cinematic sequence.
+      removeIDISPresentation();
+      startIDISCinematicSequence();
+    }
   }
 
   function foundAtlanta() {
@@ -2069,7 +2670,31 @@ document.addEventListener('DOMContentLoaded', () => {
 
     prepareBackVideo();
 
-    // Prime video playback during a user gesture for iPhone autoplay rules.
+    // Prime IDIS cinematic videos during the same Start AR user gesture.
+    // This improves later inline playback reliability on mobile browsers.
+    [idisShowcaseVideo, idisFeatureVideo].forEach(video => {
+      if (!video) return;
+
+      prepareIDISCinematicVideo(video);
+
+      try {
+        const priming = video.play();
+
+        if (
+          priming &&
+          typeof priming.then === 'function'
+        ) {
+          priming
+            .then(() => {
+              video.pause();
+              try { video.currentTime = 0; } catch (_) {}
+            })
+            .catch(() => {});
+        }
+      } catch (_) {}
+    });
+
+    // Prime Atlanta background video during a user gesture for iPhone autoplay rules.
     if (layerBack && layerBack.tagName === 'VIDEO') {
       try {
         const priming = layerBack.play();
@@ -2208,6 +2833,46 @@ document.addEventListener('DOMContentLoaded', () => {
   /* ------------------------------------------------------------------------
      EVENTS
   ------------------------------------------------------------------------ */
+
+  // IDIS cinematic media events.
+  if (idisShowcaseVideo) {
+    prepareIDISCinematicVideo(idisShowcaseVideo);
+    idisShowcaseVideo.addEventListener(
+      'ended',
+      handleIDISShowcaseEnded
+    );
+
+    idisShowcaseVideo.addEventListener('error', () => {
+      if (
+        idisSequenceActive &&
+        idisSequencePhase === 'showcase'
+      ) {
+        console.warn('IDIS showcase source error.');
+        launchIDISFeatureSegment();
+      }
+    });
+  }
+
+  if (idisFeatureVideo) {
+    prepareIDISCinematicVideo(idisFeatureVideo);
+    idisFeatureVideo.addEventListener(
+      'ended',
+      handleIDISFeatureEnded
+    );
+
+    idisFeatureVideo.addEventListener('error', () => {
+      if (
+        idisSequenceActive &&
+        (
+          idisSequencePhase === 'logo' ||
+          idisSequencePhase === 'feature'
+        )
+      ) {
+        console.warn('IDIS feature video source error.');
+        finishIDISCinematicSequence();
+      }
+    });
+  }
 
   // Restore remembered visitor name on page load.
   loadRememberedGuestName();

@@ -15,8 +15,8 @@
   <!-- Official MindAR A-Frame pairing used by the current documentation. -->
   <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
-  <link rel="stylesheet" href="./styles.css?v=20260821-fulltilt23" />
-  <script src="./ar.js?v=20260821-fulltilt23"></script>
+  <link rel="stylesheet" href="./styles.css?v=20260821-idiscinema26" />
+  <script src="./ar.js?v=20260821-idiscinema26"></script>
 </head>
 <body>
   <!--
@@ -35,7 +35,7 @@
 
       <div class="brand-lockup" aria-label="IDIS Americas">
         <img class="idis-ui-logo intro-idis-logo"
-             src="./assets/ui/idis-logo.png?v=20260821-fulltilt23"
+             src="./assets/ui/idis-logo.png?v=20260821-idiscinema26"
              alt="IDIS Americas" />
       </div>
 
@@ -74,7 +74,7 @@
     <header id="ar-header" class="ar-ui hidden">
       <div class="mini-brand" aria-label="IDIS Americas">
         <img class="idis-ui-logo header-idis-logo"
-             src="./assets/ui/idis-logo.png?v=20260821-fulltilt23"
+             src="./assets/ui/idis-logo.png?v=20260821-idiscinema26"
              alt="IDIS Americas" />
       </div>
       <button id="close-ar" class="icon-button" type="button" aria-label="Close augmented reality">×</button>
@@ -118,15 +118,56 @@
         <video id="atlanta-layer-back" class="atlanta-layer layer-back"
                muted playsinline webkit-playsinline loop preload="auto"
                aria-hidden="true">
-          <source src="./assets/parallax/atlanta/layer-1-back.mp4?v=20260821-fulltilt23" type="video/mp4" />
+          <source src="./assets/parallax/atlanta/layer-1-back.mp4?v=20260821-idiscinema26" type="video/mp4" />
         </video>
         <img id="atlanta-layer-middle" class="atlanta-layer layer-middle"
-             src="./assets/parallax/atlanta/layer-2-middle.png?v=20260821-fulltilt23" alt="" />
+             src="./assets/parallax/atlanta/layer-2-middle.png?v=20260821-idiscinema26" alt="" />
         <img id="atlanta-layer-front" class="atlanta-layer layer-front"
-             src="./assets/parallax/atlanta/layer-3-front.png?v=20260821-fulltilt23" alt="" />
+             src="./assets/parallax/atlanta/layer-3-front.png?v=20260821-idiscinema26" alt="" />
       </div>
     </div>
 
+
+
+    <!--
+      IDIS COIN FACE CINEMATIC SEQUENCE
+
+      1. IDIS face is recognized.
+      2. Transparent showcase video plays.
+      3. Its final frame remains visible.
+      4. IDIS logo animates into the top center.
+      5. 15-second IDIS feature video plays.
+      6. Personalized six-second end card finishes the experience.
+    -->
+    <div id="idis-cinematic"
+         class="idis-cinematic cinematic-hidden"
+         aria-hidden="true">
+
+      <video id="idis-showcase-video"
+             class="idis-showcase-video cinematic-hidden"
+             muted playsinline webkit-playsinline preload="auto"
+             aria-hidden="true">
+        <source src="./assets/video/idis-showcase-alpha.webm?v=20260821-idiscinema26" type="video/webm" />
+        <source src="./assets/video/idis-showcase-alpha.mov?v=20260821-idiscinema26" type="video/quicktime" />
+      </video>
+
+      <div id="idis-feature-overlay"
+           class="idis-feature-overlay cinematic-hidden"
+           aria-hidden="true">
+
+        <img id="idis-feature-logo"
+             class="idis-feature-logo"
+             src="./assets/ui/idis-logo.png?v=20260821-idiscinema26"
+             alt="IDIS Americas" />
+
+        <video id="idis-feature-video"
+               class="idis-feature-video"
+               muted playsinline webkit-playsinline preload="auto"
+               aria-label="IDIS feature video">
+          <source src="./assets/video/idis-feature-15s.mp4?v=20260821-idiscinema26" type="video/mp4" />
+        </video>
+      </div>
+    </div>
 
 
 
@@ -137,7 +178,7 @@
       <div class="end-card-bg"></div>
       <div class="end-card-content">
         <img class="end-card-logo"
-             src="./assets/ui/idis-logo.png?v=20260821-fulltilt23"
+             src="./assets/ui/idis-logo.png?v=20260821-idiscinema26"
              alt="IDIS Americas" />
         <div id="personalized-thanks-line1" class="end-card-line1">Thank you,</div>
         <div id="personalized-thanks-line2" class="end-card-line2">Guest</div>
