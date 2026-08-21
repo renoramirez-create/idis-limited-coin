@@ -456,6 +456,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const overlay = document.querySelector('#atlanta-parallax');
   const overlayStage = document.querySelector('#atlanta-parallax-stage');
+  const backgroundWash = document.querySelector('#atlanta-background-wash');
   const layerBack = document.querySelector('#atlanta-layer-back');
   const layerMiddle = document.querySelector('#atlanta-layer-middle');
   const layerFront = document.querySelector('#atlanta-layer-front');
@@ -490,6 +491,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Atlanta render loop.
   let presentationRAF = 0;
+
+  // Opposite-face recognition watchdog.
+  let switchWatcherRAF = 0;
+  let oppositeVisibleSince = 0;
+  const OPPOSITE_FACE_HOLD_MS = 220;
 
   // IDIS detached/frozen presentation.
   let idisPresentationGroup = null;
@@ -871,6 +877,10 @@ document.addEventListener('DOMContentLoaded', () => {
     overlay.classList.remove('is-visible');
     overlay.classList.add('hidden');
 
+    if (backgroundWash) {
+      backgroundWash.style.opacity = '0';
+    }
+
     [layerBack, layerMiddle, layerFront].forEach(layer => {
       layer.style.opacity = '0';
       layer.style.transform = 'translate3d(-9999px,-9999px,0)';
@@ -1175,6 +1185,14 @@ document.addEventListener('DOMContentLoaded', () => {
     layerMiddle.style.opacity = String(clamp(middleOpacity, 0, 1));
     layerFront.style.opacity = String(clamp(frontOpacity, 0, 1));
 
+    // Dark teal background takes over the live camera at the same time
+    // as the background MP4 fades in. Tracking still uses the raw camera
+    // stream underneath this visual overlay.
+    if (backgroundWash) {
+      backgroundWash.style.opacity =
+        String(clamp(backOpacity * 0.985, 0, 0.985));
+    }
+
     // No coin tracking is used here. All coordinates are screen-centered.
     const backZ = -95;
     const middleZ = 72;
@@ -1289,6 +1307,74 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   /* ------------------------------------------------------------------------
+     OPPOSITE FACE WATCHER
+
+     targetFound remains the primary switch trigger. This second path watches
+     MindAR's target entity visibility so an opposite face can interrupt the
+     detached 30-second presentation even on phones where a second targetFound
+     callback is slow or inconsistent.
+
+     maxTrack:2 is enabled on the scene.
+  ------------------------------------------------------------------------ */
+
+  function stopSwitchWatcher() {
+    cancelAnimationFrame(switchWatcherRAF);
+    switchWatcherRAF = 0;
+    oppositeVisibleSince = 0;
+  }
+
+  function startSwitchWatcher() {
+    stopSwitchWatcher();
+
+    const watch = now => {
+      if (!active) {
+        switchWatcherRAF = 0;
+        return;
+      }
+
+      if (!currentSide) {
+        oppositeVisibleSince = 0;
+        switchWatcherRAF = requestAnimationFrame(watch);
+        return;
+      }
+
+      const oppositeSide =
+        currentSide === 'atlanta'
+          ? 'idis'
+          : 'atlanta';
+
+      const oppositeTarget =
+        oppositeSide === 'atlanta'
+          ? atlantaTarget
+          : idisTarget;
+
+      const oppositeVisible =
+        !!(
+          oppositeTarget &&
+          oppositeTarget.object3D &&
+          oppositeTarget.object3D.visible
+        );
+
+      if (oppositeVisible) {
+        if (!oppositeVisibleSince) {
+          oppositeVisibleSince = now;
+        }
+
+        if (now - oppositeVisibleSince >= OPPOSITE_FACE_HOLD_MS) {
+          oppositeVisibleSince = 0;
+          beginPresentation(oppositeSide);
+        }
+      } else {
+        oppositeVisibleSince = 0;
+      }
+
+      switchWatcherRAF = requestAnimationFrame(watch);
+    };
+
+    switchWatcherRAF = requestAnimationFrame(watch);
+  }
+
+  /* ------------------------------------------------------------------------
      30 SECOND PRESENTATION SESSION
   ------------------------------------------------------------------------ */
 
@@ -1356,6 +1442,7 @@ document.addEventListener('DOMContentLoaded', () => {
     hidePresentationControls();
 
     currentSide = null;
+    oppositeVisibleSince = 0;
     resetGestureState();
 
     // MindAR camera/tracking STAYS ON.
@@ -1375,6 +1462,7 @@ document.addEventListener('DOMContentLoaded', () => {
     hideAllPresentations();
 
     currentSide = side;
+    oppositeVisibleSince = 0;
     resetGestureState();
     hideScanUI();
     showPresentationControls();
@@ -1474,6 +1562,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
       active = true;
       styleCameraVideos();
+      startSwitchWatcher();
 
       const actualW = cameraVideo.videoWidth || 0;
       const actualH = cameraVideo.videoHeight || 0;
@@ -1522,6 +1611,7 @@ document.addEventListener('DOMContentLoaded', () => {
     clearPresentationTimer();
     hideAllPresentations();
     hidePresentationControls();
+    stopSwitchWatcher();
     resetGestureState();
 
     hideError();
@@ -1655,6 +1745,7 @@ document.addEventListener('DOMContentLoaded', () => {
     clearPresentationTimer();
     hideAllPresentations();
     hidePresentationControls();
+    stopSwitchWatcher();
 
     try {
       if (arSystem) arSystem.stop();

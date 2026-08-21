@@ -8,7 +8,7 @@
 *{box-sizing:border-box}
 html,body{margin:0;height:100%;overflow:hidden;background:#061014;color:white;font-family:Arial,sans-serif;touch-action:none}
 .scene{position:relative;width:100%;height:100%;overflow:hidden;perspective:820px;background:radial-gradient(circle at 50% 50%,#17333b 0,#061014 48%,#020405 100%)}
-.stage{position:absolute;inset:0;transform-style:preserve-3d}
+.wash{position:absolute;inset:0;background:radial-gradient(circle at 50% 42%,#0b3f44 0,#032327 42%,#011215 100%);opacity:0;pointer-events:none}.stage{position:absolute;inset:0;transform-style:preserve-3d}
 .layer{position:absolute;object-fit:contain;pointer-events:none;will-change:transform,opacity}
 .note{position:fixed;z-index:30;top:12px;left:12px;right:12px;padding:11px 13px;border:1px solid #ffffff2e;border-radius:12px;background:#061014dc;font-size:12px;line-height:1.45}
 .timer{position:fixed;z-index:31;bottom:18px;left:50%;transform:translateX(-50%);padding:8px 12px;border-radius:999px;border:1px solid #ffffff2e;background:#061014dc;font-size:11px}
@@ -18,12 +18,13 @@ html,body{margin:0;height:100%;overflow:hidden;background:#061014;color:white;fo
 </head>
 <body>
 <div class="scene">
+  <div id="wash" class="wash"></div>
   <div id="stage" class="stage">
     <video id="back" class="layer" muted loop playsinline preload="auto">
-      <source src="./assets/parallax/atlanta/layer-1-back.mp4?v=20260821-scene15" type="video/mp4">
+      <source src="./assets/parallax/atlanta/layer-1-back.mp4?v=20260821-scene16" type="video/mp4">
     </video>
-    <img id="mid" class="layer" src="./assets/parallax/atlanta/layer-2-middle.png?v=20260821-scene15">
-    <img id="front" class="layer" src="./assets/parallax/atlanta/layer-3-front.png?v=20260821-scene15">
+    <img id="mid" class="layer" src="./assets/parallax/atlanta/layer-2-middle.png?v=20260821-scene16">
+    <img id="front" class="layer" src="./assets/parallax/atlanta/layer-3-front.png?v=20260821-scene16">
   </div>
 
   <div class="note">
@@ -37,7 +38,7 @@ html,body{margin:0;height:100%;overflow:hidden;background:#061014;color:white;fo
 </div>
 
 <script>
-const back=document.querySelector('#back'),mid=document.querySelector('#mid'),front=document.querySelector('#front');
+const back=document.querySelector('#back'),mid=document.querySelector('#mid'),front=document.querySelector('#front'),wash=document.querySelector('#wash');
 const gesture=document.querySelector('#gesture'),sec=document.querySelector('#sec'),reset=document.querySelector('#reset');
 
 const pointers=new Map();
@@ -104,7 +105,7 @@ function frame(){
 
   front.style.opacity=ease(elapsed/800);
   mid.style.opacity=ease((elapsed-1000)/900);
-  back.style.opacity=ease((elapsed-3000)/1200);
+  back.style.opacity=ease((elapsed-3000)/1200);wash.style.opacity=ease((elapsed-3000)/1200)*.985;
 
   back.style.width=backSize+'px';back.style.height=backSize+'px';
   back.style.transform=`translate3d(${cx+panX*.72-backSize/2}px,${cy+panY*.72-backSize/2}px,-95px)`;

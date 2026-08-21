@@ -525,3 +525,26 @@ video.atlanta-layer::-webkit-media-controls-panel {
     font-size: 8px;
   }
 }
+
+
+/* ==========================================================================
+   BUILD 16: DARK TEAL IMMERSIVE BACKGROUND + RELIABLE FACE SWITCHING
+============================================================================ */
+
+.atlanta-background-wash {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 50% 42%,
+      rgba(11, 63, 68, .98) 0%,
+      rgba(3, 35, 39, .985) 42%,
+      rgba(1, 18, 21, .995) 100%);
+  opacity: 0;
+  will-change: opacity;
+}
+
+.atlanta-parallax-stage {
+  z-index: 1;
+}

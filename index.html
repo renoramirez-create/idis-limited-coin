@@ -15,8 +15,8 @@
   <!-- Official MindAR A-Frame pairing used by the current documentation. -->
   <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
-  <link rel="stylesheet" href="./styles.css?v=20260821-scene15" />
-  <script src="./ar.js?v=20260821-scene15"></script>
+  <link rel="stylesheet" href="./styles.css?v=20260821-scene16" />
+  <script src="./ar.js?v=20260821-scene16"></script>
 </head>
 <body>
   <!--
@@ -35,7 +35,7 @@
 
       <div class="brand-lockup" aria-label="IDIS Americas">
         <img class="idis-ui-logo intro-idis-logo"
-             src="./assets/ui/idis-logo.png?v=20260821-scene15"
+             src="./assets/ui/idis-logo.png?v=20260821-scene16"
              alt="IDIS Americas" />
       </div>
 
@@ -60,7 +60,7 @@
     <header id="ar-header" class="ar-ui hidden">
       <div class="mini-brand" aria-label="IDIS Americas">
         <img class="idis-ui-logo header-idis-logo"
-             src="./assets/ui/idis-logo.png?v=20260821-scene15"
+             src="./assets/ui/idis-logo.png?v=20260821-scene16"
              alt="IDIS Americas" />
       </div>
       <button id="close-ar" class="icon-button" type="button" aria-label="Close augmented reality">×</button>
@@ -99,16 +99,17 @@
       That means they stay upright while the physical coin can rotate freely.
     -->
     <div id="atlanta-parallax" class="atlanta-parallax hidden" aria-hidden="true">
+      <div id="atlanta-background-wash" class="atlanta-background-wash"></div>
       <div id="atlanta-parallax-stage" class="atlanta-parallax-stage">
         <video id="atlanta-layer-back" class="atlanta-layer layer-back"
                muted playsinline webkit-playsinline loop preload="auto"
                aria-hidden="true">
-          <source src="./assets/parallax/atlanta/layer-1-back.mp4?v=20260821-scene15" type="video/mp4" />
+          <source src="./assets/parallax/atlanta/layer-1-back.mp4?v=20260821-scene16" type="video/mp4" />
         </video>
         <img id="atlanta-layer-middle" class="atlanta-layer layer-middle"
-             src="./assets/parallax/atlanta/layer-2-middle.png?v=20260821-scene15" alt="" />
+             src="./assets/parallax/atlanta/layer-2-middle.png?v=20260821-scene16" alt="" />
         <img id="atlanta-layer-front" class="atlanta-layer layer-front"
-             src="./assets/parallax/atlanta/layer-3-front.png?v=20260821-scene15" alt="" />
+             src="./assets/parallax/atlanta/layer-3-front.png?v=20260821-scene16" alt="" />
       </div>
     </div>
 
@@ -144,7 +145,7 @@
   <a-scene
     id="ar-scene"
     class="ar-stage"
-    mindar-image="imageTargetSrc: ./assets/targets/gsx2026-two-sided.mind; autoStart: false; uiLoading: no; uiError: no; uiScanning: no; filterMinCF: 0.0001; filterBeta: 0.001; warmupTolerance: 8; missTolerance: 20;"
+    mindar-image="imageTargetSrc: ./assets/targets/gsx2026-two-sided.mind; autoStart: false; uiLoading: no; uiError: no; uiScanning: no; filterMinCF: 0.0001; filterBeta: 0.001; warmupTolerance: 8; missTolerance: 20; maxTrack: 2;"
     color-space="sRGB"
     renderer="colorManagement: true; physicallyCorrectLights: true; alpha: true; antialias: true;"
     vr-mode-ui="enabled: false"
