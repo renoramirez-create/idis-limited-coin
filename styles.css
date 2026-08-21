@@ -922,3 +922,14 @@ video.atlanta-layer::-webkit-media-controls-panel {
   will-change: transform;
 }
 
+
+
+/* ==========================================================================
+   BUILD 23: FULL 4-DIRECTION PHONE TILT
+============================================================================ */
+
+.atlanta-parallax-stage {
+  will-change: transform;
+  transform-style: preserve-3d;
+  -webkit-transform-style: preserve-3d;
+}

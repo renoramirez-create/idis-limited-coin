@@ -542,18 +542,27 @@ document.addEventListener('DOMContentLoaded', () => {
   let motionTiltEnabled = false;
   let motionPermissionAttempted = false;
 
-  let rawPhoneGamma = 0;
-  let smoothPhoneGamma = 0;
+  // Latest SCREEN-RELATIVE sensor values. These continue updating even
+  // while the scanner is waiting for the next coin, so subsequent scans
+  // can immediately establish a fresh neutral position.
+  let motionSampleReady = false;
+  let rawPhoneTiltLR = 0; // left / right
+  let rawPhoneTiltUD = 0; // up / down
 
-  // Neutral position is captured when permission is enabled / AR begins,
-  // so the scene does not immediately lean because the user is holding
-  // the phone at a slight angle.
-  let phoneGammaNeutral = 0;
-  let phoneGammaNeutralCaptured = false;
+  let smoothPhoneTiltLR = 0;
+  let smoothPhoneTiltUD = 0;
 
-  // Gentle scene tilt limits.
-  const PHONE_TILT_INPUT_LIMIT = 28;   // degrees from device sensor
-  const PHONE_TILT_SCENE_LIMIT = 5.5; // visual scene degrees
+  let phoneTiltNeutralLR = 0;
+  let phoneTiltNeutralUD = 0;
+  let phoneTiltNeutralCaptured = false;
+  let phoneTiltNeutralPending = true;
+
+  // Sensor delta and visual scene limits.
+  const PHONE_TILT_INPUT_LIMIT_LR = 30;
+  const PHONE_TILT_INPUT_LIMIT_UD = 30;
+
+  const PHONE_TILT_SCENE_LIMIT_LR = 6.5;
+  const PHONE_TILT_SCENE_LIMIT_UD = 5.5;
 
   const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
   const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
@@ -563,39 +572,146 @@ document.addEventListener('DOMContentLoaded', () => {
   /* ------------------------------------------------------------------------
      PHONE MOTION TILT
 
-     DeviceOrientation.gamma is the phone's left/right tilt.
-     We use the motion sensors (accelerometer/gyroscope fusion), not the camera.
+     Uses DeviceOrientation beta + gamma.
 
-     iOS requires DeviceOrientationEvent.requestPermission() from a user tap.
-     Android/Chrome usually starts providing events without that extra prompt.
+     gamma = left/right device tilt
+     beta  = front/back device tilt
+
+     The values are remapped into SCREEN coordinates so portrait and landscape
+     orientations behave consistently.
+
+     Most importantly, sensor samples remain live between coin scans. When a
+     new coin scene begins we immediately capture the CURRENT sensor sample as
+     neutral instead of clearing the values and waiting for a new event.
   ------------------------------------------------------------------------ */
+
+  function normalizeScreenAngle(value) {
+    let angle = Number(value) || 0;
+    angle = ((angle % 360) + 360) % 360;
+
+    if (angle >= 315 || angle < 45) return 0;
+    if (angle >= 45 && angle < 135) return 90;
+    if (angle >= 135 && angle < 225) return 180;
+    return 270;
+  }
+
+  function getScreenOrientationAngle() {
+    if (
+      window.screen &&
+      screen.orientation &&
+      Number.isFinite(Number(screen.orientation.angle))
+    ) {
+      return normalizeScreenAngle(screen.orientation.angle);
+    }
+
+    if (Number.isFinite(Number(window.orientation))) {
+      return normalizeScreenAngle(window.orientation);
+    }
+
+    return 0;
+  }
+
+  function mapDeviceTiltToScreen(beta, gamma) {
+    const angle = getScreenOrientationAngle();
+
+    // Convert beta/gamma to axes relative to what the visitor sees on screen.
+    switch (angle) {
+      case 90:
+        return {
+          leftRight: beta,
+          upDown: -gamma
+        };
+
+      case 180:
+        return {
+          leftRight: -gamma,
+          upDown: -beta
+        };
+
+      case 270:
+        return {
+          leftRight: -beta,
+          upDown: gamma
+        };
+
+      case 0:
+      default:
+        return {
+          leftRight: gamma,
+          upDown: beta
+        };
+    }
+  }
+
+  function shortestAngleDelta(current, neutral) {
+    let delta = current - neutral;
+
+    while (delta > 180) delta -= 360;
+    while (delta < -180) delta += 360;
+
+    return delta;
+  }
+
+  function capturePhoneTiltNeutral() {
+    if (!motionTiltEnabled) {
+      phoneTiltNeutralCaptured = false;
+      phoneTiltNeutralPending = true;
+      return;
+    }
+
+    if (!motionSampleReady) {
+      phoneTiltNeutralCaptured = false;
+      phoneTiltNeutralPending = true;
+      return;
+    }
+
+    phoneTiltNeutralLR = rawPhoneTiltLR;
+    phoneTiltNeutralUD = rawPhoneTiltUD;
+
+    smoothPhoneTiltLR = rawPhoneTiltLR;
+    smoothPhoneTiltUD = rawPhoneTiltUD;
+
+    phoneTiltNeutralCaptured = true;
+    phoneTiltNeutralPending = false;
+  }
 
   function handleDeviceOrientation(event) {
     if (!motionTiltEnabled) return;
 
+    const beta = Number(event.beta);
     const gamma = Number(event.gamma);
 
-    if (!Number.isFinite(gamma)) return;
+    if (!Number.isFinite(beta) || !Number.isFinite(gamma)) {
+      return;
+    }
 
-    rawPhoneGamma = clamp(
-      gamma,
-      -PHONE_TILT_INPUT_LIMIT,
-      PHONE_TILT_INPUT_LIMIT
-    );
+    const mapped = mapDeviceTiltToScreen(beta, gamma);
 
-    // Capture the initial holding angle as neutral.
-    if (!phoneGammaNeutralCaptured) {
-      phoneGammaNeutral = rawPhoneGamma;
-      smoothPhoneGamma = rawPhoneGamma;
-      phoneGammaNeutralCaptured = true;
+    rawPhoneTiltLR = mapped.leftRight;
+    rawPhoneTiltUD = mapped.upDown;
+    motionSampleReady = true;
+
+    // If a new presentation began before the first sensor event arrived,
+    // establish neutral on this first valid sample.
+    if (phoneTiltNeutralPending || !phoneTiltNeutralCaptured) {
+      capturePhoneTiltNeutral();
     }
   }
 
   function resetPhoneTiltNeutral() {
-    phoneGammaNeutralCaptured = false;
-    phoneGammaNeutral = 0;
-    rawPhoneGamma = 0;
-    smoothPhoneGamma = 0;
+    // DO NOT erase raw sensor values. Keeping the latest sample is what fixes
+    // tilt after the second, third, fourth coin scan.
+    phoneTiltNeutralCaptured = false;
+    phoneTiltNeutralPending = true;
+
+    capturePhoneTiltNeutral();
+  }
+
+  function handleScreenOrientationChange() {
+    // The beta/gamma axes remap after portrait/landscape rotation.
+    // Re-zero on the next live sample so the scene does not jump.
+    phoneTiltNeutralCaptured = false;
+    phoneTiltNeutralPending = true;
   }
 
   async function enablePhoneTilt() {
@@ -610,7 +726,7 @@ document.addEventListener('DOMContentLoaded', () => {
     motionPermissionAttempted = true;
 
     try {
-      // Required by iOS 13+.
+      // iOS 13+ requires this inside a user gesture.
       if (
         typeof DeviceOrientationEvent.requestPermission === 'function'
       ) {
@@ -628,7 +744,26 @@ document.addEventListener('DOMContentLoaded', () => {
         true
       );
 
+      window.addEventListener(
+        'orientationchange',
+        handleScreenOrientationChange,
+        true
+      );
+
+      if (
+        screen.orientation &&
+        typeof screen.orientation.addEventListener === 'function'
+      ) {
+        screen.orientation.addEventListener(
+          'change',
+          handleScreenOrientationChange
+        );
+      }
+
       motionTiltEnabled = true;
+
+      // Preserve any sample collected in this session and establish neutral
+      // as soon as possible.
       resetPhoneTiltNeutral();
 
       return true;
@@ -645,36 +780,94 @@ document.addEventListener('DOMContentLoaded', () => {
         handleDeviceOrientation,
         true
       );
+
+      window.removeEventListener(
+        'orientationchange',
+        handleScreenOrientationChange,
+        true
+      );
+
+      if (
+        screen.orientation &&
+        typeof screen.orientation.removeEventListener === 'function'
+      ) {
+        screen.orientation.removeEventListener(
+          'change',
+          handleScreenOrientationChange
+        );
+      }
     }
 
     motionTiltEnabled = false;
-    resetPhoneTiltNeutral();
+
+    // Keep the last values only as harmless state, but require a fresh
+    // sample when motion is enabled again.
+    motionSampleReady = false;
+    phoneTiltNeutralCaptured = false;
+    phoneTiltNeutralPending = true;
   }
 
   function updatePhoneTilt() {
-    if (!motionTiltEnabled || !phoneGammaNeutralCaptured) {
-      return 0;
+    if (
+      !motionTiltEnabled ||
+      !motionSampleReady ||
+      !phoneTiltNeutralCaptured
+    ) {
+      return { x: 0, y: 0 };
     }
 
-    // Smooth the sensor signal to avoid tiny accelerometer/gyro jitter.
-    smoothPhoneGamma = lerp(
-      smoothPhoneGamma,
-      rawPhoneGamma,
-      0.08
+    // Smooth both axes independently.
+    smoothPhoneTiltLR = lerp(
+      smoothPhoneTiltLR,
+      rawPhoneTiltLR,
+      0.095
     );
 
-    const relativeGamma = clamp(
-      smoothPhoneGamma - phoneGammaNeutral,
-      -PHONE_TILT_INPUT_LIMIT,
-      PHONE_TILT_INPUT_LIMIT
+    smoothPhoneTiltUD = lerp(
+      smoothPhoneTiltUD,
+      rawPhoneTiltUD,
+      0.095
     );
 
-    return clamp(
-      (relativeGamma / PHONE_TILT_INPUT_LIMIT) *
-        PHONE_TILT_SCENE_LIMIT,
-      -PHONE_TILT_SCENE_LIMIT,
-      PHONE_TILT_SCENE_LIMIT
+    const deltaLR = clamp(
+      shortestAngleDelta(
+        smoothPhoneTiltLR,
+        phoneTiltNeutralLR
+      ),
+      -PHONE_TILT_INPUT_LIMIT_LR,
+      PHONE_TILT_INPUT_LIMIT_LR
     );
+
+    const deltaUD = clamp(
+      shortestAngleDelta(
+        smoothPhoneTiltUD,
+        phoneTiltNeutralUD
+      ),
+      -PHONE_TILT_INPUT_LIMIT_UD,
+      PHONE_TILT_INPUT_LIMIT_UD
+    );
+
+    const leftRight = clamp(
+      (deltaLR / PHONE_TILT_INPUT_LIMIT_LR) *
+        PHONE_TILT_SCENE_LIMIT_LR,
+      -PHONE_TILT_SCENE_LIMIT_LR,
+      PHONE_TILT_SCENE_LIMIT_LR
+    );
+
+    // Negative converts the physical screen pitch into a natural CSS
+    // perspective response: tilt the top of the phone away and the virtual
+    // scene follows that perspective.
+    const upDown = clamp(
+      -(deltaUD / PHONE_TILT_INPUT_LIMIT_UD) *
+        PHONE_TILT_SCENE_LIMIT_UD,
+      -PHONE_TILT_SCENE_LIMIT_UD,
+      PHONE_TILT_SCENE_LIMIT_UD
+    );
+
+    return {
+      x: upDown,     // rotateX
+      y: leftRight  // rotateY
+    };
   }
 
   /* ------------------------------------------------------------------------
@@ -1526,7 +1719,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Subtle user-driven depth angle. It is tied to DRAG position,
     // not the physical coin.
     if (overlayStage) {
-      const rx = clamp(
+      const gestureRX = clamp(
         -(panY / Math.max(1, window.innerHeight)) * 7,
         -3.5,
         3.5
@@ -1538,14 +1731,21 @@ document.addEventListener('DOMContentLoaded', () => {
         4
       );
 
-      // Phone tilt is independent of drag. Tilting the phone left/right
-      // adds a gentle camera-like perspective lean to the detached scene.
-      const phoneRY = updatePhoneTilt();
+      // Full phone orientation enhancement:
+      // phoneTilt.x = up/down pitch
+      // phoneTilt.y = left/right yaw
+      const phoneTilt = updatePhoneTilt();
+
+      const rx = clamp(
+        gestureRX + phoneTilt.x,
+        -9.0,
+        9.0
+      );
 
       const ry = clamp(
-        gestureRY + phoneRY,
-        -8.5,
-        8.5
+        gestureRY + phoneTilt.y,
+        -10.0,
+        10.0
       );
 
       const stageTransform =
@@ -1580,8 +1780,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const scale = 0.82 * zoom;
     idisPresentationGroup.scale.setScalar(scale);
 
-    // A small gesture-driven tilt adds depth without reconnecting to the coin.
-    idisPresentationGroup.rotation.x = clamp(
+    // Gesture tilt and phone tilt work together.
+    const gesturePitch = clamp(
       -(panY / Math.max(1, window.innerHeight)) * 0.10,
       -0.06,
       0.06
@@ -1593,13 +1793,24 @@ document.addEventListener('DOMContentLoaded', () => {
       0.07
     );
 
+    const phoneTilt = updatePhoneTilt();
+
+    const phonePitch =
+      THREE.MathUtils.degToRad(phoneTilt.x);
+
     const phoneYaw =
-      THREE.MathUtils.degToRad(updatePhoneTilt());
+      THREE.MathUtils.degToRad(phoneTilt.y);
+
+    idisPresentationGroup.rotation.x = clamp(
+      gesturePitch + phonePitch,
+      -0.17,
+      0.17
+    );
 
     idisPresentationGroup.rotation.y = clamp(
       gestureYaw + phoneYaw,
-      -0.15,
-      0.15
+      -0.18,
+      0.18
     );
 
     idisPresentationGroup.rotation.z = 0;
@@ -1798,8 +2009,8 @@ document.addEventListener('DOMContentLoaded', () => {
     oppositeVisibleSince = 0;
     resetGestureState();
 
-    // Treat the phone's current holding angle as the new neutral position
-    // for each unlocked scene.
+    // Re-zero from the latest LIVE sensor sample for every unlocked scene.
+    // This works on the first scan and all subsequent scans.
     resetPhoneTiltNeutral();
 
     hideScanUI();
@@ -1845,7 +2056,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Request motion access while we are still inside the user's Start AR tap.
     // On Android this usually resolves without a prompt; on iPhone Safari
     // this is where iOS may ask for Motion & Orientation access.
-    if (!motionPermissionAttempted) {
+    if (!motionTiltEnabled) {
       try {
         await enablePhoneTilt();
       } catch (_) {}
