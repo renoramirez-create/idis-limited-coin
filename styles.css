@@ -1111,3 +1111,28 @@ video.atlanta-layer::-webkit-media-controls-panel {
     max-height: 64vh;
   }
 }
+
+
+/* ==========================================================================
+   BUILD 27: YOUTUBE FEATURE PLAYER
+============================================================================ */
+
+#idis-feature-youtube {
+  overflow: hidden;
+  background: #000;
+}
+
+#idis-feature-youtube iframe {
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
+  min-height: min(52vw, 540px);
+  border: 0;
+  pointer-events: none;
+}
+
+@media (max-width: 420px) {
+  #idis-feature-youtube iframe {
+    min-height: 52vw;
+  }
+}

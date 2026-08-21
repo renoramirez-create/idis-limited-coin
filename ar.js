@@ -469,7 +469,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const idisShowcaseVideo = document.querySelector('#idis-showcase-video');
   const idisFeatureOverlay = document.querySelector('#idis-feature-overlay');
   const idisFeatureLogo = document.querySelector('#idis-feature-logo');
-  const idisFeatureVideo = document.querySelector('#idis-feature-video');
+  const idisFeatureYouTubeHost = document.querySelector('#idis-feature-youtube');
 
   const guestNameInput = document.querySelector('#guest-name');
   const guestNameField = document.querySelector('.guest-name-field');
@@ -486,6 +486,9 @@ document.addEventListener('DOMContentLoaded', () => {
   // IDIS is now media-driven.
   const IDIS_LOGO_TO_FEATURE_DELAY_MS = 850;
   const IDIS_CINEMATIC_EXIT_MS = 620;
+
+  const IDIS_YOUTUBE_VIDEO_ID = 'G7vGMc4Z2os';
+  const IDIS_YOUTUBE_START_TIMEOUT_MS = 12000;
 
   const END_CARD_MS = 6000;
   const END_CARD_FADE_OUT_MS = 900;
@@ -532,8 +535,13 @@ document.addEventListener('DOMContentLoaded', () => {
   // IDIS cinematic sequence.
   let idisFeatureStartTimer = null;
   let idisCinematicExitTimer = null;
+  let idisYouTubeStartTimeout = null;
   let idisSequenceActive = false;
   let idisSequencePhase = 'idle';
+
+  let idisYouTubePlayer = null;
+  let idisYouTubeReady = false;
+  let idisYouTubePendingPlay = false;
 
   // Gesture state shared by both scenes.
   const pointers = new Map();
@@ -1731,6 +1739,11 @@ document.addEventListener('DOMContentLoaded', () => {
       clearTimeout(idisCinematicExitTimer);
       idisCinematicExitTimer = null;
     }
+
+    if (idisYouTubeStartTimeout) {
+      clearTimeout(idisYouTubeStartTimeout);
+      idisYouTubeStartTimeout = null;
+    }
   }
 
   function resetIDISCinematicSequence() {
@@ -1757,7 +1770,7 @@ document.addEventListener('DOMContentLoaded', () => {
       idisFeatureOverlay.setAttribute('aria-hidden', 'true');
     }
 
-    safeResetIDISVideo(idisFeatureVideo);
+    stopIDISYouTubeFeature();
 
     if (idisCinematic) {
       idisCinematic.classList.remove('cinematic-exit');
@@ -1857,6 +1870,218 @@ document.addEventListener('DOMContentLoaded', () => {
     idisShowcaseVideo.classList.add('is-frozen');
   }
 
+  function initializeIDISYouTubePlayer() {
+    if (
+      idisYouTubePlayer ||
+      !idisFeatureYouTubeHost ||
+      !window.YT ||
+      typeof window.YT.Player !== 'function'
+    ) {
+      return;
+    }
+
+    idisYouTubePlayer = new YT.Player(
+      idisFeatureYouTubeHost,
+      {
+        videoId: IDIS_YOUTUBE_VIDEO_ID,
+
+        playerVars: {
+          autoplay: 0,
+          controls: 0,
+          disablekb: 1,
+          fs: 0,
+          playsinline: 1,
+          rel: 0,
+          iv_load_policy: 3,
+          modestbranding: 1,
+          origin: window.location.origin
+        },
+
+        events: {
+          onReady: event => {
+            idisYouTubeReady = true;
+
+            try {
+              event.target.mute();
+              event.target.cueVideoById(
+                IDIS_YOUTUBE_VIDEO_ID
+              );
+            } catch (_) {}
+
+            if (idisYouTubePendingPlay) {
+              playIDISYouTubeFeature();
+            }
+          },
+
+          onStateChange: event => {
+            if (!window.YT) return;
+
+            if (
+              event.data === YT.PlayerState.PLAYING
+            ) {
+              if (idisYouTubeStartTimeout) {
+                clearTimeout(
+                  idisYouTubeStartTimeout
+                );
+                idisYouTubeStartTimeout = null;
+              }
+            }
+
+            if (
+              event.data === YT.PlayerState.ENDED
+            ) {
+              handleIDISFeatureEnded();
+            }
+          },
+
+          onError: event => {
+            console.warn(
+              'IDIS YouTube player error:',
+              event.data
+            );
+
+            if (
+              idisSequenceActive &&
+              (
+                idisSequencePhase === 'logo' ||
+                idisSequencePhase === 'feature'
+              )
+            ) {
+              finishIDISCinematicSequence();
+            }
+          }
+        }
+      }
+    );
+  }
+
+  function ensureIDISYouTubeAPI() {
+    if (
+      window.YT &&
+      typeof window.YT.Player === 'function'
+    ) {
+      initializeIDISYouTubePlayer();
+      return;
+    }
+
+    // iframe_api calls this global function once it is ready.
+    const previous =
+      window.onYouTubeIframeAPIReady;
+
+    window.onYouTubeIframeAPIReady = () => {
+      if (typeof previous === 'function') {
+        try { previous(); } catch (_) {}
+      }
+
+      initializeIDISYouTubePlayer();
+    };
+  }
+
+  function stopIDISYouTubeFeature() {
+    idisYouTubePendingPlay = false;
+
+    if (idisYouTubeStartTimeout) {
+      clearTimeout(idisYouTubeStartTimeout);
+      idisYouTubeStartTimeout = null;
+    }
+
+    if (
+      idisYouTubePlayer &&
+      typeof idisYouTubePlayer.stopVideo ===
+        'function'
+    ) {
+      try {
+        idisYouTubePlayer.stopVideo();
+      } catch (_) {}
+    }
+  }
+
+  function playIDISYouTubeFeature() {
+    if (
+      !active ||
+      currentSide !== 'idis' ||
+      !idisSequenceActive
+    ) {
+      return;
+    }
+
+    ensureIDISYouTubeAPI();
+
+    if (
+      !idisYouTubeReady ||
+      !idisYouTubePlayer
+    ) {
+      idisYouTubePendingPlay = true;
+
+      if (!idisYouTubeStartTimeout) {
+        idisYouTubeStartTimeout =
+          setTimeout(() => {
+            idisYouTubeStartTimeout = null;
+
+            if (
+              idisSequenceActive &&
+              idisSequencePhase === 'feature'
+            ) {
+              console.warn(
+                'YouTube feature did not start in time.'
+              );
+
+              finishIDISCinematicSequence();
+            }
+          }, IDIS_YOUTUBE_START_TIMEOUT_MS);
+      }
+
+      return;
+    }
+
+    idisYouTubePendingPlay = false;
+
+    try {
+      idisYouTubePlayer.mute();
+      idisYouTubePlayer.seekTo(0, true);
+      idisYouTubePlayer.playVideo();
+
+      if (idisYouTubeStartTimeout) {
+        clearTimeout(idisYouTubeStartTimeout);
+      }
+
+      idisYouTubeStartTimeout =
+        setTimeout(() => {
+          idisYouTubeStartTimeout = null;
+
+          if (
+            idisSequenceActive &&
+            idisSequencePhase === 'feature'
+          ) {
+            let state = null;
+
+            try {
+              state =
+                idisYouTubePlayer.getPlayerState();
+            } catch (_) {}
+
+            if (
+              !window.YT ||
+              state !== YT.PlayerState.PLAYING
+            ) {
+              console.warn(
+                'YouTube autoplay was blocked.'
+              );
+
+              finishIDISCinematicSequence();
+            }
+          }
+        }, IDIS_YOUTUBE_START_TIMEOUT_MS);
+    } catch (error) {
+      console.warn(
+        'Could not start IDIS YouTube feature:',
+        error
+      );
+
+      finishIDISCinematicSequence();
+    }
+  }
+
   function launchIDISFeatureSegment() {
     if (
       !active ||
@@ -1899,16 +2124,7 @@ document.addEventListener('DOMContentLoaded', () => {
         idisFeatureOverlay.classList.add('video-in');
       }
 
-      safeResetIDISVideo(idisFeatureVideo);
-
-      playIDISVideo(idisFeatureVideo).catch(error => {
-        console.warn(
-          'IDIS 15-second feature video could not play:',
-          error
-        );
-
-        finishIDISCinematicSequence();
-      });
+      playIDISYouTubeFeature();
     }, IDIS_LOGO_TO_FEATURE_DELAY_MS);
   }
 
@@ -1932,7 +2148,7 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    try { idisFeatureVideo.pause(); } catch (_) {}
+    stopIDISYouTubeFeature();
     finishIDISCinematicSequence();
   }
 
@@ -1973,7 +2189,7 @@ document.addEventListener('DOMContentLoaded', () => {
     idisSequencePhase = 'showcase';
 
     prepareIDISCinematicVideo(idisShowcaseVideo);
-    prepareIDISCinematicVideo(idisFeatureVideo);
+    ensureIDISYouTubeAPI();
 
     startIDISShowcaseVideo();
   }
@@ -2672,7 +2888,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Prime IDIS cinematic videos during the same Start AR user gesture.
     // This improves later inline playback reliability on mobile browsers.
-    [idisShowcaseVideo, idisFeatureVideo].forEach(video => {
+    [idisShowcaseVideo].forEach(video => {
       if (!video) return;
 
       prepareIDISCinematicVideo(video);
@@ -2873,6 +3089,10 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     });
   }
+
+  // Prepare the embedded YouTube player early so it is ready by the time
+  // the transparent IDIS showcase finishes.
+  ensureIDISYouTubeAPI();
 
   // Restore remembered visitor name on page load.
   loadRememberedGuestName();
