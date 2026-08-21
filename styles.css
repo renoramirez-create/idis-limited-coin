@@ -347,3 +347,36 @@ video.atlanta-layer::-webkit-media-controls-panel {
   display: none !important;
   -webkit-appearance: none;
 }
+
+
+/* --------------------------------------------------------------------------
+   OFFICIAL IDIS UI LOGO
+---------------------------------------------------------------------------- */
+.idis-ui-logo {
+  display: block;
+  object-fit: contain;
+  height: auto;
+  max-height: 100%;
+  filter: drop-shadow(0 4px 14px rgba(0,0,0,.45));
+}
+
+.intro-idis-logo {
+  width: 150px;
+  max-width: 42vw;
+}
+
+.header-idis-logo {
+  width: 92px;
+  max-width: 28vw;
+}
+
+.mini-brand {
+  min-height: 28px;
+  display: flex;
+  align-items: center;
+}
+
+@media (max-width: 390px) {
+  .intro-idis-logo { width: 132px; }
+  .header-idis-logo { width: 82px; }
+}

@@ -469,6 +469,7 @@ document.addEventListener('DOMContentLoaded', () => {
   let currentSide = null;
   let lossTimer = null;
   let overlayRAF = 0;
+  let backVideoStartTimer = null;
 
   // Smoothed screen anchor and offsets.
   let sx = 0, sy = 0;
@@ -481,6 +482,13 @@ document.addEventListener('DOMContentLoaded', () => {
   const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
   const lerp = (a, b, t) => a + (b - a) * t;
   const easeOutCubic = t => 1 - Math.pow(1 - clamp(t, 0, 1), 3);
+
+  function clearBackVideoTimer() {
+    if (backVideoStartTimer) {
+      clearTimeout(backVideoStartTimer);
+      backVideoStartTimer = null;
+    }
+  }
 
   function prepareBackVideo() {
     if (!layerBack || layerBack.tagName !== 'VIDEO') return;
@@ -549,6 +557,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initializedOverlay = false;
     frontRevealStart = 0;
 
+    clearBackVideoTimer();
     stopBackVideo(true);
 
     overlay.classList.remove('is-visible');
@@ -572,7 +581,17 @@ document.addEventListener('DOMContentLoaded', () => {
     overlay.classList.add('is-visible');
     frontRevealStart = performance.now();
 
-    startBackVideo();
+    // Reveal sequence:
+    // 0.0s  front/top PNG
+    // 1.0s  middle PNG
+    // 3.0s  background video begins and fades in
+    backVideoStartTimer = setTimeout(() => {
+      backVideoStartTimer = null;
+      if (active && currentSide === 'atlanta' && !overlay.classList.contains('hidden')) {
+        startBackVideo();
+      }
+    }, 3000);
+
     updateAtlantaOverlay(true);
   }
 
@@ -784,9 +803,9 @@ document.addEventListener('DOMContentLoaded', () => {
       `translate3d(${sx + smx - baseSize/2}px, ${sy + smy - baseSize/2}px, 0)`;
 
     // Front: strongest parallax and dramatic scale-in.
-    const elapsed = frontRevealStart ? performance.now() - frontRevealStart : 2000;
-    const revealT = easeOutCubic((elapsed - 500) / 1550);
-    const frontScale = lerp(0.68, 1.0, revealT);
+    const elapsed = frontRevealStart ? performance.now() - frontRevealStart : 1200;
+    const revealT = easeOutCubic(elapsed / 900);
+    const frontScale = lerp(0.82, 1.0, revealT);
 
     layerFront.style.width = `${baseSize}px`;
     layerFront.style.height = `${baseSize}px`;
