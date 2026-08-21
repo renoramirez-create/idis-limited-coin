@@ -538,10 +538,144 @@ document.addEventListener('DOMContentLoaded', () => {
   let lastInteractionAt = 0;
   let returningHome = false;
 
+  // Phone motion / orientation tilt.
+  let motionTiltEnabled = false;
+  let motionPermissionAttempted = false;
+
+  let rawPhoneGamma = 0;
+  let smoothPhoneGamma = 0;
+
+  // Neutral position is captured when permission is enabled / AR begins,
+  // so the scene does not immediately lean because the user is holding
+  // the phone at a slight angle.
+  let phoneGammaNeutral = 0;
+  let phoneGammaNeutralCaptured = false;
+
+  // Gentle scene tilt limits.
+  const PHONE_TILT_INPUT_LIMIT = 28;   // degrees from device sensor
+  const PHONE_TILT_SCENE_LIMIT = 5.5; // visual scene degrees
+
   const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
   const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
   const lerp = (a, b, t) => a + (b - a) * t;
   const easeOutCubic = t => 1 - Math.pow(1 - clamp(t, 0, 1), 3);
+
+  /* ------------------------------------------------------------------------
+     PHONE MOTION TILT
+
+     DeviceOrientation.gamma is the phone's left/right tilt.
+     We use the motion sensors (accelerometer/gyroscope fusion), not the camera.
+
+     iOS requires DeviceOrientationEvent.requestPermission() from a user tap.
+     Android/Chrome usually starts providing events without that extra prompt.
+  ------------------------------------------------------------------------ */
+
+  function handleDeviceOrientation(event) {
+    if (!motionTiltEnabled) return;
+
+    const gamma = Number(event.gamma);
+
+    if (!Number.isFinite(gamma)) return;
+
+    rawPhoneGamma = clamp(
+      gamma,
+      -PHONE_TILT_INPUT_LIMIT,
+      PHONE_TILT_INPUT_LIMIT
+    );
+
+    // Capture the initial holding angle as neutral.
+    if (!phoneGammaNeutralCaptured) {
+      phoneGammaNeutral = rawPhoneGamma;
+      smoothPhoneGamma = rawPhoneGamma;
+      phoneGammaNeutralCaptured = true;
+    }
+  }
+
+  function resetPhoneTiltNeutral() {
+    phoneGammaNeutralCaptured = false;
+    phoneGammaNeutral = 0;
+    rawPhoneGamma = 0;
+    smoothPhoneGamma = 0;
+  }
+
+  async function enablePhoneTilt() {
+    if (motionTiltEnabled) return true;
+
+    if (
+      typeof window.DeviceOrientationEvent === 'undefined'
+    ) {
+      return false;
+    }
+
+    motionPermissionAttempted = true;
+
+    try {
+      // Required by iOS 13+.
+      if (
+        typeof DeviceOrientationEvent.requestPermission === 'function'
+      ) {
+        const result =
+          await DeviceOrientationEvent.requestPermission();
+
+        if (result !== 'granted') {
+          return false;
+        }
+      }
+
+      window.addEventListener(
+        'deviceorientation',
+        handleDeviceOrientation,
+        true
+      );
+
+      motionTiltEnabled = true;
+      resetPhoneTiltNeutral();
+
+      return true;
+    } catch (error) {
+      console.warn('Phone motion permission unavailable:', error);
+      return false;
+    }
+  }
+
+  function disablePhoneTilt() {
+    if (motionTiltEnabled) {
+      window.removeEventListener(
+        'deviceorientation',
+        handleDeviceOrientation,
+        true
+      );
+    }
+
+    motionTiltEnabled = false;
+    resetPhoneTiltNeutral();
+  }
+
+  function updatePhoneTilt() {
+    if (!motionTiltEnabled || !phoneGammaNeutralCaptured) {
+      return 0;
+    }
+
+    // Smooth the sensor signal to avoid tiny accelerometer/gyro jitter.
+    smoothPhoneGamma = lerp(
+      smoothPhoneGamma,
+      rawPhoneGamma,
+      0.08
+    );
+
+    const relativeGamma = clamp(
+      smoothPhoneGamma - phoneGammaNeutral,
+      -PHONE_TILT_INPUT_LIMIT,
+      PHONE_TILT_INPUT_LIMIT
+    );
+
+    return clamp(
+      (relativeGamma / PHONE_TILT_INPUT_LIMIT) *
+        PHONE_TILT_SCENE_LIMIT,
+      -PHONE_TILT_SCENE_LIMIT,
+      PHONE_TILT_SCENE_LIMIT
+    );
+  }
 
   /* ------------------------------------------------------------------------
      REMEMBERED GUEST NAME
@@ -1398,10 +1532,20 @@ document.addEventListener('DOMContentLoaded', () => {
         3.5
       );
 
-      const ry = clamp(
+      const gestureRY = clamp(
         (panX / Math.max(1, window.innerWidth)) * 8,
         -4,
         4
+      );
+
+      // Phone tilt is independent of drag. Tilting the phone left/right
+      // adds a gentle camera-like perspective lean to the detached scene.
+      const phoneRY = updatePhoneTilt();
+
+      const ry = clamp(
+        gestureRY + phoneRY,
+        -8.5,
+        8.5
       );
 
       const stageTransform =
@@ -1443,10 +1587,19 @@ document.addEventListener('DOMContentLoaded', () => {
       0.06
     );
 
-    idisPresentationGroup.rotation.y = clamp(
+    const gestureYaw = clamp(
       (panX / Math.max(1, window.innerWidth)) * 0.12,
       -0.07,
       0.07
+    );
+
+    const phoneYaw =
+      THREE.MathUtils.degToRad(updatePhoneTilt());
+
+    idisPresentationGroup.rotation.y = clamp(
+      gestureYaw + phoneYaw,
+      -0.15,
+      0.15
     );
 
     idisPresentationGroup.rotation.z = 0;
@@ -1644,6 +1797,11 @@ document.addEventListener('DOMContentLoaded', () => {
     currentSide = side;
     oppositeVisibleSince = 0;
     resetGestureState();
+
+    // Treat the phone's current holding angle as the new neutral position
+    // for each unlocked scene.
+    resetPhoneTiltNeutral();
+
     hideScanUI();
     showPresentationControls();
 
@@ -1683,6 +1841,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
   async function startAR() {
     if (starting || active) return;
+
+    // Request motion access while we are still inside the user's Start AR tap.
+    // On Android this usually resolves without a prompt; on iPhone Safari
+    // this is where iOS may ask for Motion & Orientation access.
+    if (!motionPermissionAttempted) {
+      try {
+        await enablePhoneTilt();
+      } catch (_) {}
+    }
 
     // Capture the current field and remember it for future visits.
     if (guestNameInput) {
@@ -1799,6 +1966,7 @@ document.addEventListener('DOMContentLoaded', () => {
     hideAllPresentations();
     hidePresentationControls();
     stopSwitchWatcher();
+    disablePhoneTilt();
     resetGestureState();
 
     hideError();
@@ -1955,6 +2123,7 @@ document.addEventListener('DOMContentLoaded', () => {
     hideAllPresentations();
     hidePresentationControls();
     stopSwitchWatcher();
+    disablePhoneTilt();
 
     try {
       if (arSystem) arSystem.stop();

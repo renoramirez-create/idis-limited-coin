@@ -912,3 +912,13 @@ video.atlanta-layer::-webkit-media-controls-panel {
 .guest-name-field.has-memory {
   display: none !important;
 }
+
+
+/* ==========================================================================
+   BUILD 22: PHONE MOTION TILT
+============================================================================ */
+
+.atlanta-parallax-stage {
+  will-change: transform;
+}
+
