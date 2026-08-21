@@ -482,6 +482,44 @@ document.addEventListener('DOMContentLoaded', () => {
   const lerp = (a, b, t) => a + (b - a) * t;
   const easeOutCubic = t => 1 - Math.pow(1 - clamp(t, 0, 1), 3);
 
+  function prepareBackVideo() {
+    if (!layerBack || layerBack.tagName !== 'VIDEO') return;
+    layerBack.muted = true;
+    layerBack.defaultMuted = true;
+    layerBack.playsInline = true;
+    layerBack.setAttribute('playsinline', '');
+    layerBack.setAttribute('webkit-playsinline', '');
+  }
+
+  function startBackVideo() {
+    if (!layerBack || layerBack.tagName !== 'VIDEO') return;
+    prepareBackVideo();
+
+    try {
+      // Restart the background motion each time the Atlanta side is acquired.
+      if (Number.isFinite(layerBack.duration) && layerBack.duration > 0) {
+        layerBack.currentTime = 0;
+      } else {
+        layerBack.currentTime = 0;
+      }
+    } catch (_) {}
+
+    const playPromise = layerBack.play();
+    if (playPromise && typeof playPromise.catch === 'function') {
+      playPromise.catch(error => {
+        console.warn('Atlanta background video could not autoplay yet:', error);
+      });
+    }
+  }
+
+  function stopBackVideo(reset = true) {
+    if (!layerBack || layerBack.tagName !== 'VIDEO') return;
+    try { layerBack.pause(); } catch (_) {}
+    if (reset) {
+      try { layerBack.currentTime = 0; } catch (_) {}
+    }
+  }
+
   function setARUI(show) {
     [header, footer].forEach(el => el && el.classList.toggle('hidden', !show));
     if (!show) {
@@ -511,6 +549,8 @@ document.addEventListener('DOMContentLoaded', () => {
     initializedOverlay = false;
     frontRevealStart = 0;
 
+    stopBackVideo(true);
+
     overlay.classList.remove('is-visible');
     overlay.classList.add('hidden');
 
@@ -532,6 +572,7 @@ document.addEventListener('DOMContentLoaded', () => {
     overlay.classList.add('is-visible');
     frontRevealStart = performance.now();
 
+    startBackVideo();
     updateAtlantaOverlay(true);
   }
 
@@ -817,6 +858,21 @@ document.addEventListener('DOMContentLoaded', () => {
 
   async function startAR() {
     if (starting || active) return;
+
+    // Prime the muted inline MP4 during the user's tap. It remains paused
+    // until the Atlanta target is actually detected.
+    prepareBackVideo();
+    if (layerBack && layerBack.tagName === 'VIDEO') {
+      try {
+        const priming = layerBack.play();
+        if (priming && typeof priming.then === 'function') {
+          priming.then(() => {
+            layerBack.pause();
+            try { layerBack.currentTime = 0; } catch (_) {}
+          }).catch(() => {});
+        }
+      } catch (_) {}
+    }
 
     starting = true;
     const myToken = ++sessionToken;

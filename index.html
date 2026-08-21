@@ -12,8 +12,8 @@
   <!-- Official MindAR A-Frame pairing used by the current documentation. -->
   <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
-  <link rel="stylesheet" href="./styles.css?v=20260821-overlay9" />
-  <script src="./ar.js?v=20260821-overlay9"></script>
+  <link rel="stylesheet" href="./styles.css?v=20260821-video10" />
+  <script src="./ar.js?v=20260821-video10"></script>
 </head>
 <body>
   <!--
@@ -94,12 +94,15 @@
       That means they stay upright while the physical coin can rotate freely.
     -->
     <div id="atlanta-parallax" class="atlanta-parallax hidden" aria-hidden="true">
-      <img id="atlanta-layer-back" class="atlanta-layer layer-back"
-           src="./assets/parallax/atlanta/layer-1-back.png?v=20260821-overlay9" alt="" />
+      <video id="atlanta-layer-back" class="atlanta-layer layer-back"
+             muted playsinline webkit-playsinline loop preload="auto"
+             aria-hidden="true">
+        <source src="./assets/parallax/atlanta/layer-1-back.mp4?v=20260821-video10" type="video/mp4" />
+      </video>
       <img id="atlanta-layer-middle" class="atlanta-layer layer-middle"
-           src="./assets/parallax/atlanta/layer-2-middle.png?v=20260821-overlay9" alt="" />
+           src="./assets/parallax/atlanta/layer-2-middle.png?v=20260821-video10" alt="" />
       <img id="atlanta-layer-front" class="atlanta-layer layer-front"
-           src="./assets/parallax/atlanta/layer-3-front.png?v=20260821-overlay9" alt="" />
+           src="./assets/parallax/atlanta/layer-3-front.png?v=20260821-video10" alt="" />
     </div>
 
     <div id="error-card" class="error-card hidden" role="alert">

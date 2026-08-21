@@ -333,3 +333,17 @@ button { cursor: pointer; }
   15%  { opacity: .10; }
   100% { opacity: 1; }
 }
+
+
+/* Back layer can now be a 1080x1080 MP4 instead of a PNG. */
+video.atlanta-layer {
+  background: transparent;
+  object-fit: contain;
+}
+
+video.atlanta-layer::-webkit-media-controls,
+video.atlanta-layer::-webkit-media-controls-enclosure,
+video.atlanta-layer::-webkit-media-controls-panel {
+  display: none !important;
+  -webkit-appearance: none;
+}
