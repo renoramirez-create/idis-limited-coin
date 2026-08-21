@@ -465,10 +465,22 @@ document.addEventListener('DOMContentLoaded', () => {
   const presentationUI = document.querySelector('#presentation-ui');
   const presentationSeconds = document.querySelector('#presentation-seconds');
 
+  const guestNameInput = document.querySelector('#guest-name');
+  const guestNameField = document.querySelector('.guest-name-field');
+
+  const endCard = document.querySelector('#end-card');
+  const personalizedThanksLine1 = document.querySelector('#personalized-thanks-line1');
+
   const TARGET_FILE = './assets/targets/gsx2026-two-sided.mind';
 
   const PRESENTATION_MS = 30000;
   const HOME_DELAY_MS = 3000;
+
+  const END_CARD_MS = 6000;
+  const END_CARD_FADE_OUT_MS = 900;
+
+  const GUEST_NAME_STORAGE_KEY = 'idis-gsx2026-guest-name';
+  let guestName = '';
 
   let arSystem = null;
   let starting = false;
@@ -484,6 +496,10 @@ document.addEventListener('DOMContentLoaded', () => {
   let presentationDeadline = 0;
   let presentationTimeout = null;
   let countdownRAF = 0;
+
+  let endCardTimer = null;
+  let endCardFadeTimer = null;
+  let endCardActive = false;
 
   // Atlanta video reveal.
   let backVideoStartTimer = null;
@@ -525,6 +541,140 @@ document.addEventListener('DOMContentLoaded', () => {
   const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
   const lerp = (a, b, t) => a + (b - a) * t;
   const easeOutCubic = t => 1 - Math.pow(1 - clamp(t, 0, 1), 3);
+
+  /* ------------------------------------------------------------------------
+     REMEMBERED GUEST NAME
+  ------------------------------------------------------------------------ */
+
+  function cleanGuestName(value) {
+    return String(value || '')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .slice(0, 40);
+  }
+
+  function readGuestName() {
+    try {
+      return cleanGuestName(
+        window.localStorage.getItem(GUEST_NAME_STORAGE_KEY)
+      );
+    } catch (_) {
+      return '';
+    }
+  }
+
+  function saveGuestName(value) {
+    guestName = cleanGuestName(value);
+
+    try {
+      if (guestName) {
+        window.localStorage.setItem(
+          GUEST_NAME_STORAGE_KEY,
+          guestName
+        );
+      } else {
+        window.localStorage.removeItem(
+          GUEST_NAME_STORAGE_KEY
+        );
+      }
+    } catch (_) {
+      // Private browsing or browser storage restrictions should not block AR.
+    }
+
+    if (guestNameInput) {
+      guestNameInput.value = guestName;
+    }
+
+    if (guestNameField) {
+      guestNameField.classList.toggle(
+        'has-memory',
+        !!guestName
+      );
+    }
+
+    return guestName;
+  }
+
+  function loadRememberedGuestName() {
+    guestName = readGuestName();
+
+    if (guestNameInput && guestName) {
+      guestNameInput.value = guestName;
+    }
+
+    if (guestNameField) {
+      guestNameField.classList.toggle(
+        'has-memory',
+        !!guestName
+      );
+    }
+  }
+
+  function updatePersonalizedThanks() {
+    if (!personalizedThanksLine1) return;
+
+    personalizedThanksLine1.textContent =
+      guestName
+        ? `Thank you, ${guestName}`
+        : 'Thank you';
+  }
+
+  function clearEndCardTimers() {
+    if (endCardTimer) {
+      clearTimeout(endCardTimer);
+      endCardTimer = null;
+    }
+
+    if (endCardFadeTimer) {
+      clearTimeout(endCardFadeTimer);
+      endCardFadeTimer = null;
+    }
+  }
+
+  function hideEndCard() {
+    clearEndCardTimers();
+    endCardActive = false;
+
+    if (!endCard) return;
+
+    endCard.classList.remove('phase-in', 'phase-out');
+    endCard.classList.add('hidden');
+    endCard.setAttribute('aria-hidden', 'true');
+  }
+
+  function showEndCard() {
+    clearEndCardTimers();
+    updatePersonalizedThanks();
+
+    if (!endCard) {
+      finishEndCardToScan();
+      return;
+    }
+
+    endCardActive = true;
+
+    // Force a clean animation restart every time.
+    endCard.classList.remove('hidden', 'phase-in', 'phase-out');
+    void endCard.offsetWidth;
+    endCard.classList.add('phase-in');
+    endCard.setAttribute('aria-hidden', 'false');
+
+    // Begin fade-out so the complete end-card experience lasts 6 seconds.
+    endCardFadeTimer = setTimeout(() => {
+      endCardFadeTimer = null;
+
+      if (!endCardActive) return;
+
+      endCard.classList.remove('phase-in');
+      endCard.classList.add('phase-out');
+    }, END_CARD_MS - END_CARD_FADE_OUT_MS);
+
+    endCardTimer = setTimeout(() => {
+      endCardTimer = null;
+      finishEndCardToScan();
+    }, END_CARD_MS);
+  }
+
 
   /* ------------------------------------------------------------------------
      CAMERA / UI
@@ -901,10 +1051,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     revealStartedAt = performance.now();
 
-    // Staged reveal stays the same:
-    // 0 sec = front
-    // 1 sec = middle
-    // 3 sec = background video
+    // Staged reveal:
+    // 0.0s -> 1.0s = front/top fades in
+    // 1.0s -> 2.0s = middle fades in
+    // 2.0s -> 3.0s = background video + teal fade in
     backVideoStartTimer = setTimeout(() => {
       backVideoStartTimer = null;
 
@@ -915,7 +1065,7 @@ document.addEventListener('DOMContentLoaded', () => {
       ) {
         startBackVideo();
       }
-    }, 3000);
+    }, 2000);
 
     renderPresentation();
   }
@@ -1152,13 +1302,18 @@ document.addEventListener('DOMContentLoaded', () => {
       ? now - revealStartedAt
       : 5000;
 
-    const frontOpacity = easeOutCubic(elapsed / 800);
-    const middleOpacity = easeOutCubic((elapsed - 1000) / 900);
-    const backOpacity = easeOutCubic((elapsed - 3000) / 1200);
+    // Clean 1-second reveal windows:
+    // FRONT:  0.0s -> 1.0s
+    // MIDDLE: 1.0s -> 2.0s
+    // VIDEO:  2.0s -> 3.0s
+    const frontOpacity = easeOutCubic(elapsed / 1000);
+    const middleOpacity = easeOutCubic((elapsed - 1000) / 1000);
+    const backOpacity = easeOutCubic((elapsed - 2000) / 1000);
+
     const frontRevealScale = lerp(
       0.82,
       1,
-      easeOutCubic(elapsed / 900)
+      easeOutCubic(elapsed / 1000)
     );
 
     const longSide = Math.max(window.innerWidth, window.innerHeight);
@@ -1436,22 +1591,38 @@ document.addEventListener('DOMContentLoaded', () => {
     removeIDISPresentation();
   }
 
-  function endPresentationToScan() {
-    clearPresentationTimer();
-    hideAllPresentations();
-    hidePresentationControls();
+  function finishEndCardToScan() {
+    hideEndCard();
 
     currentSide = null;
     oppositeVisibleSince = 0;
     resetGestureState();
 
-    // MindAR camera/tracking STAYS ON.
-    // We simply return to the scan state.
+    // Camera + MindAR stay live underneath.
+    setARUI(true);
     showScanUI('SCAN COIN NOW');
   }
 
+  function endPresentationToScan() {
+    clearPresentationTimer();
+
+    // Hide the interactive content but do NOT return to scan yet.
+    hideAllPresentations();
+    hidePresentationControls();
+
+    // During the end card, prevent the switch watchdog from changing scenes.
+    currentSide = null;
+    oppositeVisibleSince = 0;
+    resetGestureState();
+
+    // Hide scanner HUD and let the end card own the screen.
+    hideScanUI();
+
+    showEndCard();
+  }
+
   function beginPresentation(side) {
-    if (!active) return;
+    if (!active || endCardActive) return;
 
     // If the same face is recognized again during its 30-second session,
     // do nothing. It does NOT restart the timer.
@@ -1504,6 +1675,11 @@ document.addEventListener('DOMContentLoaded', () => {
   async function startAR() {
     if (starting || active) return;
 
+    // Capture the current field and remember it for future visits.
+    if (guestNameInput) {
+      saveGuestName(guestNameInput.value);
+    }
+
     prepareBackVideo();
 
     // Prime video playback during a user gesture for iPhone autoplay rules.
@@ -1526,6 +1702,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const myToken = ++sessionToken;
 
     hideError();
+    hideEndCard();
     clearPresentationTimer();
     hideAllPresentations();
     hidePresentationControls();
@@ -1608,6 +1785,7 @@ document.addEventListener('DOMContentLoaded', () => {
     starting = false;
     currentSide = null;
 
+    hideEndCard();
     clearPresentationTimer();
     hideAllPresentations();
     hidePresentationControls();
@@ -1642,6 +1820,27 @@ document.addEventListener('DOMContentLoaded', () => {
   /* ------------------------------------------------------------------------
      EVENTS
   ------------------------------------------------------------------------ */
+
+  // Restore remembered visitor name on page load.
+  loadRememberedGuestName();
+
+  if (guestNameInput) {
+    guestNameInput.addEventListener('change', () => {
+      saveGuestName(guestNameInput.value);
+    });
+
+    guestNameInput.addEventListener('blur', () => {
+      saveGuestName(guestNameInput.value);
+    });
+
+    guestNameInput.addEventListener('keydown', event => {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        saveGuestName(guestNameInput.value);
+        guestNameInput.blur();
+      }
+    });
+  }
 
   scene.addEventListener('loaded', () => {
     arSystem = scene.systems['mindar-image-system'];
@@ -1742,6 +1941,7 @@ document.addEventListener('DOMContentLoaded', () => {
     active = false;
     currentSide = null;
 
+    hideEndCard();
     clearPresentationTimer();
     hideAllPresentations();
     hidePresentationControls();

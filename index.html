@@ -15,8 +15,8 @@
   <!-- Official MindAR A-Frame pairing used by the current documentation. -->
   <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
-  <link rel="stylesheet" href="./styles.css?v=20260821-scene16" />
-  <script src="./ar.js?v=20260821-scene16"></script>
+  <link rel="stylesheet" href="./styles.css?v=20260821-timing19" />
+  <script src="./ar.js?v=20260821-timing19"></script>
 </head>
 <body>
   <!--
@@ -35,7 +35,7 @@
 
       <div class="brand-lockup" aria-label="IDIS Americas">
         <img class="idis-ui-logo intro-idis-logo"
-             src="./assets/ui/idis-logo.png?v=20260821-scene16"
+             src="./assets/ui/idis-logo.png?v=20260821-timing19"
              alt="IDIS Americas" />
       </div>
 
@@ -46,6 +46,20 @@
           Scan either side of the <strong>IDIS Americas GSX 2026 coin</strong>.
           The Atlanta side unlocks the event location. The IDIS side unlocks the brand experience.
         </p>
+      </div>
+
+
+      <div class="guest-name-field">
+        <label for="guest-name">YOUR NAME</label>
+        <div class="guest-name-input-wrap">
+          <input id="guest-name"
+                 type="text"
+                 inputmode="text"
+                 autocomplete="name"
+                 maxlength="40"
+                 placeholder="Enter your name" />
+          <span id="guest-name-memory" class="guest-name-memory">REMEMBERED ON THIS DEVICE</span>
+        </div>
       </div>
 
       <div class="intro-actions">
@@ -60,7 +74,7 @@
     <header id="ar-header" class="ar-ui hidden">
       <div class="mini-brand" aria-label="IDIS Americas">
         <img class="idis-ui-logo header-idis-logo"
-             src="./assets/ui/idis-logo.png?v=20260821-scene16"
+             src="./assets/ui/idis-logo.png?v=20260821-timing19"
              alt="IDIS Americas" />
       </div>
       <button id="close-ar" class="icon-button" type="button" aria-label="Close augmented reality">×</button>
@@ -104,17 +118,30 @@
         <video id="atlanta-layer-back" class="atlanta-layer layer-back"
                muted playsinline webkit-playsinline loop preload="auto"
                aria-hidden="true">
-          <source src="./assets/parallax/atlanta/layer-1-back.mp4?v=20260821-scene16" type="video/mp4" />
+          <source src="./assets/parallax/atlanta/layer-1-back.mp4?v=20260821-timing19" type="video/mp4" />
         </video>
         <img id="atlanta-layer-middle" class="atlanta-layer layer-middle"
-             src="./assets/parallax/atlanta/layer-2-middle.png?v=20260821-scene16" alt="" />
+             src="./assets/parallax/atlanta/layer-2-middle.png?v=20260821-timing19" alt="" />
         <img id="atlanta-layer-front" class="atlanta-layer layer-front"
-             src="./assets/parallax/atlanta/layer-3-front.png?v=20260821-scene16" alt="" />
+             src="./assets/parallax/atlanta/layer-3-front.png?v=20260821-timing19" alt="" />
       </div>
     </div>
 
 
-    <!-- Interactive scene controls shown only after a coin face has been recognized. -->
+
+
+    <div id="end-card"
+         class="end-card hidden"
+         aria-live="polite"
+         aria-hidden="true">
+      <div class="end-card-bg"></div>
+      <div class="end-card-content">
+        <div id="personalized-thanks-line1" class="end-card-line1">Thank you</div>
+        <div class="end-card-line2">See Security Smarter</div>
+      </div>
+    </div>
+
+<!-- Interactive scene controls shown only after a coin face has been recognized. -->
     <div id="presentation-ui" class="presentation-ui hidden" aria-hidden="true">
       <div class="presentation-hint">DRAG • PINCH TO EXPLORE</div>
       <div class="presentation-timer"><span id="presentation-seconds">30</span>s</div>

@@ -21,10 +21,10 @@ html,body{margin:0;height:100%;overflow:hidden;background:#061014;color:white;fo
   <div id="wash" class="wash"></div>
   <div id="stage" class="stage">
     <video id="back" class="layer" muted loop playsinline preload="auto">
-      <source src="./assets/parallax/atlanta/layer-1-back.mp4?v=20260821-scene16" type="video/mp4">
+      <source src="./assets/parallax/atlanta/layer-1-back.mp4?v=20260821-timing19" type="video/mp4">
     </video>
-    <img id="mid" class="layer" src="./assets/parallax/atlanta/layer-2-middle.png?v=20260821-scene16">
-    <img id="front" class="layer" src="./assets/parallax/atlanta/layer-3-front.png?v=20260821-scene16">
+    <img id="mid" class="layer" src="./assets/parallax/atlanta/layer-2-middle.png?v=20260821-timing19">
+    <img id="front" class="layer" src="./assets/parallax/atlanta/layer-3-front.png?v=20260821-timing19">
   </div>
 
   <div class="note">
@@ -55,7 +55,7 @@ const ease=t=>{t=clamp(t,0,1);return 1-Math.pow(1-t,3)};
 const dist=(a,b)=>Math.hypot(b.x-a.x,b.y-a.y);
 const midPoint=(a,b)=>({x:(a.x+b.x)/2,y:(a.y+b.y)/2});
 
-setTimeout(()=>back.play().catch(()=>{}),3000);
+setTimeout(()=>back.play().catch(()=>{}),2000);
 
 function beginDrag(p){dragX=p.x;dragY=p.y;startPanX=panX;startPanY=panY}
 function beginPinch(){
@@ -103,9 +103,9 @@ function frame(){
   const longSide=Math.max(innerWidth,innerHeight),base=longSide*.92*zoom,backSize=base*1.12;
   const cx=innerWidth/2,cy=innerHeight/2;
 
-  front.style.opacity=ease(elapsed/800);
-  mid.style.opacity=ease((elapsed-1000)/900);
-  back.style.opacity=ease((elapsed-3000)/1200);wash.style.opacity=ease((elapsed-3000)/1200)*.985;
+  front.style.opacity=ease(elapsed/1000);
+  mid.style.opacity=ease((elapsed-1000)/1000);
+  back.style.opacity=ease((elapsed-2000)/1000);wash.style.opacity=ease((elapsed-2000)/1000)*.985;
 
   back.style.width=backSize+'px';back.style.height=backSize+'px';
   back.style.transform=`translate3d(${cx+panX*.72-backSize/2}px,${cy+panY*.72-backSize/2}px,-95px)`;
@@ -114,7 +114,7 @@ function frame(){
   mid.style.transform=`translate3d(${cx+panX*.94-base/2}px,${cy+panY*.94-(40/1920)*base-base/2}px,72px)`;
 
   front.style.width=base+'px';front.style.height=base+'px';
-  front.style.transform=`translate3d(${cx+panX*1.13-base/2}px,${cy+panY*1.13-base/2}px,245px) scale(${.82+.18*ease(elapsed/900)})`;
+  front.style.transform=`translate3d(${cx+panX*1.13-base/2}px,${cy+panY*1.13-base/2}px,245px) scale(${.82+.18*ease(elapsed/1000)})`;
 
   sec.textContent=Math.max(0,Math.ceil((deadline-now)/1000));
 

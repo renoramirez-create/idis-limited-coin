@@ -548,3 +548,230 @@ video.atlanta-layer::-webkit-media-controls-panel {
 .atlanta-parallax-stage {
   z-index: 1;
 }
+
+
+/* ==========================================================================
+   BUILD 17: REMEMBERED GUEST NAME + PERSONALIZED CENTER MESSAGE
+============================================================================ */
+
+.guest-name-field {
+  position: relative;
+  z-index: 2;
+  margin-top: 24px;
+  width: min(100%, 420px);
+}
+
+.guest-name-field > label {
+  display: block;
+  margin: 0 0 7px 2px;
+  color: rgba(255,255,255,.62);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: .14em;
+}
+
+.guest-name-input-wrap {
+  position: relative;
+}
+
+#guest-name {
+  display: block;
+  width: 100%;
+  min-height: 48px;
+  padding: 13px 15px;
+  border: 1px solid rgba(255,255,255,.16);
+  border-radius: 13px;
+  outline: none;
+  background: rgba(3,10,13,.56);
+  color: #fff;
+  font: inherit;
+  font-size: 16px;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.035),
+    0 10px 28px rgba(0,0,0,.16);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  transition:
+    border-color .2s ease,
+    background .2s ease,
+    box-shadow .2s ease;
+}
+
+#guest-name::placeholder {
+  color: rgba(255,255,255,.34);
+}
+
+#guest-name:focus {
+  border-color: rgba(101,255,241,.58);
+  background: rgba(3,18,21,.72);
+  box-shadow:
+    0 0 0 3px rgba(101,255,241,.08),
+    0 12px 30px rgba(0,0,0,.2);
+}
+
+.guest-name-memory {
+  display: none;
+  margin: 7px 0 0 2px;
+  color: rgba(101,255,241,.58);
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: .10em;
+}
+
+.guest-name-field.has-memory .guest-name-memory {
+  display: block;
+}
+
+
+@media (max-width: 390px) {
+  .guest-name-field {
+    margin-top: 18px;
+  }
+}
+
+
+/* ==========================================================================
+   BUILD 18: 6-SECOND PERSONALIZED END CARD
+============================================================================ */
+
+.end-card {
+  position: fixed;
+  inset: 0;
+  z-index: 110000;
+  pointer-events: none;
+  overflow: hidden;
+  opacity: 1;
+  visibility: visible;
+}
+
+.end-card.hidden {
+  display: none !important;
+}
+
+.end-card-bg {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at 50% 42%,
+      rgb(11, 63, 68) 0%,
+      rgb(3, 35, 39) 45%,
+      rgb(1, 18, 21) 100%);
+  opacity: 0;
+  transform: scale(1.03);
+  will-change: opacity, transform;
+}
+
+.end-card-content {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: min(90vw, 980px);
+  transform: translate(-50%, -50%);
+  text-align: center;
+  color: #fff;
+  opacity: 1;
+  pointer-events: none;
+  text-shadow:
+    0 3px 4px rgba(0,0,0,1),
+    0 7px 18px rgba(0,0,0,.92),
+    0 16px 42px rgba(0,0,0,.72);
+}
+
+.end-card-line1,
+.end-card-line2 {
+  opacity: 0;
+  will-change: opacity, transform, filter;
+}
+
+.end-card-line1 {
+  font-size: clamp(42px, 10vw, 104px);
+  line-height: .98;
+  font-weight: 760;
+  letter-spacing: -.045em;
+  transform: translateY(26px) scale(.965);
+  filter: blur(7px);
+}
+
+.end-card-line2 {
+  margin-top: 18px;
+  font-size: clamp(21px, 5vw, 48px);
+  line-height: 1.08;
+  font-weight: 650;
+  letter-spacing: .035em;
+  transform: translateY(20px);
+  filter: blur(5px);
+}
+
+/* JS toggles these phase classes so mobile browsers do not have to
+   restart long delayed keyframes. */
+.end-card.phase-in .end-card-bg {
+  animation: endCardBgIn 700ms cubic-bezier(.22,.61,.36,1) forwards;
+}
+
+.end-card.phase-in .end-card-line1 {
+  animation: endCardLine1In 950ms cubic-bezier(.16,.84,.26,1) 360ms forwards;
+}
+
+.end-card.phase-in .end-card-line2 {
+  animation: endCardLine2In 950ms cubic-bezier(.16,.84,.26,1) 720ms forwards;
+}
+
+.end-card.phase-out {
+  animation: endCardShellOut 900ms cubic-bezier(.4,0,.2,1) forwards;
+}
+
+@keyframes endCardBgIn {
+  from {
+    opacity: 0;
+    transform: scale(1.03);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes endCardLine1In {
+  0% {
+    opacity: 0;
+    transform: translateY(26px) scale(.965);
+    filter: blur(7px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    filter: blur(0);
+  }
+}
+
+@keyframes endCardLine2In {
+  0% {
+    opacity: 0;
+    transform: translateY(20px);
+    filter: blur(5px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+    filter: blur(0);
+  }
+}
+
+@keyframes endCardShellOut {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .end-card.phase-in .end-card-bg,
+  .end-card.phase-in .end-card-line1,
+  .end-card.phase-in .end-card-line2,
+  .end-card.phase-out {
+    animation-duration: 1ms !important;
+    animation-delay: 0ms !important;
+  }
+}
