@@ -877,7 +877,14 @@ document.addEventListener('DOMContentLoaded', () => {
     };
   }
 
-  function getTiltInputs(camera) {
+  function getPerspectiveInputs(camera) {
+    /*
+      Convert the physical coin's local +Z normal into CAMERA SPACE.
+      MindAR can report the same plane with its normal facing away from the
+      viewer, which flips the apparent X/Y perspective. Normalize that first.
+
+      Z-axis roll is intentionally ignored so text/logos remain upright.
+    */
     const targetQuat = new THREE.Quaternion();
     const cameraQuat = new THREE.Quaternion();
     const invCamera = new THREE.Quaternion();
@@ -887,11 +894,24 @@ document.addEventListener('DOMContentLoaded', () => {
     camera.getWorldQuaternion(cameraQuat);
     invCamera.copy(cameraQuat).invert();
 
-    normal.applyQuaternion(targetQuat).applyQuaternion(invCamera).normalize();
+    normal
+      .applyQuaternion(targetQuat)
+      .applyQuaternion(invCamera)
+      .normalize();
+
+    // Always use the plane face pointing toward the camera/viewer.
+    if (normal.z < 0) normal.multiplyScalar(-1);
+
+    // For a plane whose initial normal is +Z:
+    // rotateY(yaw)   -> normal.x = sin(yaw)
+    // rotateX(pitch) -> normal.y = -sin(pitch)
+    const yawRad = Math.atan2(normal.x, Math.max(0.001, normal.z));
+    const pitchRad = -Math.atan2(normal.y, Math.max(0.001, normal.z));
 
     return {
-      x: clamp(normal.x, -0.8, 0.8),
-      y: clamp(normal.y, -0.8, 0.8)
+      normal,
+      yawDeg: THREE.MathUtils.radToDeg(yawRad),
+      pitchDeg: THREE.MathUtils.radToDeg(pitchRad)
     };
   }
 
@@ -919,7 +939,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     const { x, y, rect, camera } = projected;
-    const tilt = getTiltInputs(camera);
+    const perspective = getPerspectiveInputs(camera);
 
     // ------------------------------------------------------------------
     // DISTANCE-BASED GRAPHIC ZOOM
@@ -956,17 +976,25 @@ document.addEventListener('DOMContentLoaded', () => {
     // Middle sits about 40 design pixels above the back.
     const middleYOffset = -(40 / 1920) * baseSize;
 
-    // Parallax. Back is calm, middle subtle, front much stronger.
-    const middleTargetX = (-tilt.x * baseSize * 0.040) - (nx * baseSize * 0.018);
-    const middleTargetY = middleYOffset + (tilt.y * baseSize * 0.030) + (ny * baseSize * 0.012);
+    /*
+      preserve-3d + translateZ now creates the primary parallax.
+      The previous build also pushed layers using an inverted target normal,
+      which visually fought the 3D plane rotation. Keep only a tiny amount
+      of screen drift so the depth feels natural instead of sliding sideways.
+    */
+    const middleTargetX = -(nx * baseSize * 0.006);
+    const middleTargetY = middleYOffset + (ny * baseSize * 0.004);
 
-    const frontTargetX = (-tilt.x * baseSize * 0.105) - (nx * baseSize * 0.045);
-    const frontTargetY = (tilt.y * baseSize * 0.072) + (ny * baseSize * 0.032);
+    const frontTargetX = -(nx * baseSize * 0.014);
+    const frontTargetY = (ny * baseSize * 0.010);
 
-    // Gentle 3D plane tilt. We use the coin's perspective (X/Y tilt) but
-    // deliberately ignore Z rotation, so logos/text remain upright.
-    const targetRX = clamp(tilt.y * 12.0, -9.0, 9.0);
-    const targetRY = clamp(-tilt.x * 12.0, -9.0, 9.0);
+    /*
+      Apply the coin plane's TRUE camera-space pitch/yaw direction.
+      No Z rotation is applied, so the graphics remain upright.
+    */
+    const perspectiveGain = 0.82;
+    const targetRX = clamp(perspective.pitchDeg * perspectiveGain, -11.5, 11.5);
+    const targetRY = clamp(perspective.yawDeg * perspectiveGain, -11.5, 11.5);
 
     if (!initializedOverlay || force) {
       sx = x; sy = y;
@@ -983,8 +1011,8 @@ document.addEventListener('DOMContentLoaded', () => {
       smy = lerp(smy, middleTargetY, 0.10);
       sfx = lerp(sfx, frontTargetX, 0.11);
       sfy = lerp(sfy, frontTargetY, 0.11);
-      stageRX = lerp(stageRX, targetRX, 0.10);
-      stageRY = lerp(stageRY, targetRY, 0.10);
+      stageRX = lerp(stageRX, targetRX, 0.135);
+      stageRY = lerp(stageRY, targetRY, 0.135);
     }
 
     // Perspective origin is the tracked coin, not the center of the phone.
