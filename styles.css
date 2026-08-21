@@ -380,3 +380,38 @@ video.atlanta-layer::-webkit-media-controls-panel {
   .intro-idis-logo { width: 132px; }
   .header-idis-logo { width: 82px; }
 }
+
+
+/* ==========================================================================
+   MOBILE-STABLE STAGED REVEAL + GENTLE 3D PERSPECTIVE
+   Reveal opacity is controlled by JavaScript, not CSS animation timing.
+   This avoids mobile Safari/Chrome animation restarts and caching quirks.
+============================================================================ */
+.atlanta-parallax {
+  perspective: 1450px;
+  -webkit-perspective: 1450px;
+  perspective-origin: 50% 50%;
+  -webkit-perspective-origin: 50% 50%;
+}
+
+.atlanta-parallax-stage {
+  position: absolute;
+  inset: 0;
+  transform-style: preserve-3d;
+  -webkit-transform-style: preserve-3d;
+  will-change: transform;
+  pointer-events: none;
+}
+
+.atlanta-parallax.is-visible .layer-front,
+.atlanta-parallax.is-visible .layer-middle,
+.atlanta-parallax.is-visible .layer-back {
+  animation: none !important;
+  -webkit-animation: none !important;
+}
+
+/* Let the 3 layers participate in the perspective transform. */
+.atlanta-layer {
+  transform-style: preserve-3d;
+  -webkit-transform-style: preserve-3d;
+}

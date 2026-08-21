@@ -455,6 +455,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const errorClose = document.querySelector('#error-close');
 
   const overlay = document.querySelector('#atlanta-parallax');
+  const overlayStage = document.querySelector('#atlanta-parallax-stage');
   const layerBack = document.querySelector('#atlanta-layer-back');
   const layerMiddle = document.querySelector('#atlanta-layer-middle');
   const layerFront = document.querySelector('#atlanta-layer-front');
@@ -477,6 +478,7 @@ document.addEventListener('DOMContentLoaded', () => {
   let sfx = 0, sfy = 0;
   let initializedOverlay = false;
   let frontRevealStart = 0;
+  let stageRX = 0, stageRY = 0;
 
   const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
   const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
@@ -556,6 +558,8 @@ document.addEventListener('DOMContentLoaded', () => {
     overlayRAF = 0;
     initializedOverlay = false;
     frontRevealStart = 0;
+    stageRX = 0;
+    stageRY = 0;
 
     clearBackVideoTimer();
     stopBackVideo(true);
@@ -563,15 +567,17 @@ document.addEventListener('DOMContentLoaded', () => {
     overlay.classList.remove('is-visible');
     overlay.classList.add('hidden');
 
+    if (overlayStage) {
+      overlayStage.style.transform = 'none';
+      overlayStage.style.webkitTransform = 'none';
+      overlayStage.style.transformOrigin = '50% 50% 0';
+    }
+
     [layerBack, layerMiddle, layerFront].forEach(layer => {
       layer.style.opacity = '0';
       layer.style.transform = 'translate3d(-9999px,-9999px,0)';
-      layer.style.animation = 'none';
+      layer.style.webkitTransform = 'translate3d(-9999px,-9999px,0)';
     });
-
-    // Force CSS animation reset for the next detection.
-    void overlay.offsetWidth;
-    [layerBack, layerMiddle, layerFront].forEach(layer => layer.style.animation = '');
   }
 
   function showAtlantaOverlay() {
@@ -579,12 +585,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
     overlay.classList.remove('hidden');
     overlay.classList.add('is-visible');
+
+    // One master clock drives all three layers.
+    // 0.0s = FRONT
+    // 1.0s = MIDDLE
+    // 3.0s = BACK VIDEO
     frontRevealStart = performance.now();
 
-    // Reveal sequence:
-    // 0.0s  front/top PNG
-    // 1.0s  middle PNG
-    // 3.0s  background video begins and fades in
     backVideoStartTimer = setTimeout(() => {
       backVideoStartTimer = null;
       if (active && currentSide === 'atlanta' && !overlay.classList.contains('hidden')) {
@@ -757,8 +764,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const { x, y, rect, camera } = projected;
     const tilt = getTiltInputs(camera);
 
-    // Square size is based on the long screen dimension so the back layer fills
-    // most of the phone display, like the preview.
+    // Large square composition, similar to the preview page.
     const longSide = Math.max(window.innerWidth, window.innerHeight);
     const baseSize = longSide * 0.92;
     const backSize = baseSize * 1.12;
@@ -766,51 +772,97 @@ document.addEventListener('DOMContentLoaded', () => {
     const nx = clamp((x - rect.left - rect.width / 2) / Math.max(1, rect.width / 2), -1, 1);
     const ny = clamp((y - rect.top - rect.height / 2) / Math.max(1, rect.height / 2), -1, 1);
 
-    // Middle is about 40 design pixels above the back.
+    // Middle sits about 40 design pixels above the back.
     const middleYOffset = -(40 / 1920) * baseSize;
 
+    // Parallax. Back is calm, middle subtle, front much stronger.
     const middleTargetX = (-tilt.x * baseSize * 0.040) - (nx * baseSize * 0.018);
     const middleTargetY = middleYOffset + (tilt.y * baseSize * 0.030) + (ny * baseSize * 0.012);
 
     const frontTargetX = (-tilt.x * baseSize * 0.105) - (nx * baseSize * 0.045);
     const frontTargetY = (tilt.y * baseSize * 0.072) + (ny * baseSize * 0.032);
 
+    // Gentle 3D plane tilt. We use the coin's perspective (X/Y tilt) but
+    // deliberately ignore Z rotation, so logos/text remain upright.
+    const targetRX = clamp(tilt.y * 7.0, -5.5, 5.5);
+    const targetRY = clamp(-tilt.x * 7.0, -5.5, 5.5);
+
     if (!initializedOverlay || force) {
       sx = x; sy = y;
       smx = middleTargetX; smy = middleTargetY;
       sfx = frontTargetX; sfy = frontTargetY;
+      stageRX = targetRX;
+      stageRY = targetRY;
       initializedOverlay = true;
     } else {
-      // Strong smoothing keeps the layout calm.
+      // Calm tracking.
       sx = lerp(sx, x, 0.13);
       sy = lerp(sy, y, 0.13);
       smx = lerp(smx, middleTargetX, 0.10);
       smy = lerp(smy, middleTargetY, 0.10);
       sfx = lerp(sfx, frontTargetX, 0.11);
       sfy = lerp(sfy, frontTargetY, 0.11);
+      stageRX = lerp(stageRX, targetRX, 0.075);
+      stageRY = lerp(stageRY, targetRY, 0.075);
     }
 
-    // Back: large, calm, centered on the tracked coin.
+    // Perspective origin is the tracked coin, not the center of the phone.
+    if (overlayStage) {
+      overlay.style.perspectiveOrigin = `${sx}px ${sy}px`;
+      overlay.style.webkitPerspectiveOrigin = `${sx}px ${sy}px`;
+      overlayStage.style.transformOrigin = `${sx}px ${sy}px 0`;
+      overlayStage.style.transform =
+        `rotateX(${stageRX.toFixed(3)}deg) rotateY(${stageRY.toFixed(3)}deg)`;
+      overlayStage.style.webkitTransform =
+        `rotateX(${stageRX.toFixed(3)}deg) rotateY(${stageRY.toFixed(3)}deg)`;
+    }
+
+    // JavaScript controls reveal timing on every frame. This is much more
+    // reliable on mobile than restarting delayed CSS keyframes.
+    const elapsed = frontRevealStart ? performance.now() - frontRevealStart : 5000;
+
+    // TOP / FRONT: 0ms -> 800ms
+    const frontOpacity = easeOutCubic(elapsed / 800);
+
+    // MIDDLE: starts at 1000ms, finishes around 1900ms
+    const middleOpacity = easeOutCubic((elapsed - 1000) / 900);
+
+    // BACK VIDEO: starts at 3000ms, finishes around 4200ms
+    const backOpacity = easeOutCubic((elapsed - 3000) / 1200);
+
+    // Front also gently resolves from 82% to 100% immediately.
+    const frontScale = lerp(0.82, 1.0, easeOutCubic(elapsed / 900));
+
+    layerFront.style.opacity = String(clamp(frontOpacity, 0, 1));
+    layerMiddle.style.opacity = String(clamp(middleOpacity, 0, 1));
+    layerBack.style.opacity = String(clamp(backOpacity, 0, 1));
+
+    // Real CSS translateZ values enhance the preserve-3d effect.
+    // Positive Z is closer to the viewer.
+    const backZ = -18;
+    const middleZ = 34;
+    const frontZ = 105;
+
     layerBack.style.width = `${backSize}px`;
     layerBack.style.height = `${backSize}px`;
-    layerBack.style.transform =
-      `translate3d(${sx - backSize/2}px, ${sy - backSize/2}px, 0)`;
+    const backTransform =
+      `translate3d(${sx - backSize/2}px, ${sy - backSize/2}px, ${backZ}px)`;
+    layerBack.style.transform = backTransform;
+    layerBack.style.webkitTransform = backTransform;
 
-    // Middle: same square coordinate system, subtle parallax and +40px design lift.
     layerMiddle.style.width = `${baseSize}px`;
     layerMiddle.style.height = `${baseSize}px`;
-    layerMiddle.style.transform =
-      `translate3d(${sx + smx - baseSize/2}px, ${sy + smy - baseSize/2}px, 0)`;
-
-    // Front: strongest parallax and dramatic scale-in.
-    const elapsed = frontRevealStart ? performance.now() - frontRevealStart : 1200;
-    const revealT = easeOutCubic(elapsed / 900);
-    const frontScale = lerp(0.82, 1.0, revealT);
+    const middleTransform =
+      `translate3d(${sx + smx - baseSize/2}px, ${sy + smy - baseSize/2}px, ${middleZ}px)`;
+    layerMiddle.style.transform = middleTransform;
+    layerMiddle.style.webkitTransform = middleTransform;
 
     layerFront.style.width = `${baseSize}px`;
     layerFront.style.height = `${baseSize}px`;
-    layerFront.style.transform =
-      `translate3d(${sx + sfx - baseSize/2}px, ${sy + sfy - baseSize/2}px, 0) scale(${frontScale})`;
+    const frontTransform =
+      `translate3d(${sx + sfx - baseSize/2}px, ${sy + sfy - baseSize/2}px, ${frontZ}px) scale(${frontScale})`;
+    layerFront.style.transform = frontTransform;
+    layerFront.style.webkitTransform = frontTransform;
 
     overlayRAF = requestAnimationFrame(() => updateAtlantaOverlay(false));
   }
