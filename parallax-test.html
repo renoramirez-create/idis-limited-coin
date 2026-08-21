@@ -3,52 +3,50 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>IDIS Staged 3D Preview</title>
+<title>IDIS 4K Distance 3D Preview</title>
 <style>
 *{box-sizing:border-box}
-html,body{margin:0;height:100%;overflow:hidden;background:#071014;color:white;font-family:Arial,sans-serif}
-.scene{position:relative;width:100%;height:100%;overflow:hidden;perspective:1300px;perspective-origin:50% 52%;background:radial-gradient(circle at 50% 52%,#19363d 0,#071014 46%,#020405 100%)}
-.stage{position:absolute;inset:0;transform-style:preserve-3d;transform-origin:50% 52%;transition:transform .08s linear}
+html,body{margin:0;height:100%;overflow:hidden;background:#071014;color:#fff;font-family:Arial,sans-serif}
+.scene{position:relative;width:100%;height:100%;overflow:hidden;perspective:820px;perspective-origin:50% 52%;background:radial-gradient(circle at 50% 52%,#19363d 0,#071014 46%,#020405 100%)}
+.stage{position:absolute;inset:0;transform-style:preserve-3d;transform-origin:50% 52%;will-change:transform}
 .layer{position:absolute;left:50%;top:52%;width:min(92vh,150vw);height:min(92vh,150vw);object-fit:contain;transform-origin:center;pointer-events:none;opacity:0;will-change:transform,opacity}
 .back{width:min(103vh,168vw);height:min(103vh,168vw)}
 .note{position:fixed;z-index:50;top:12px;left:12px;right:12px;padding:11px 13px;border:1px solid #ffffff30;border-radius:12px;background:#071014e6;font-size:12px;line-height:1.45}
-.note img{width:92px;height:auto;display:block;margin-bottom:8px}
+.range{position:fixed;z-index:55;left:18px;right:18px;bottom:20px;background:#071014e8;border:1px solid #ffffff30;padding:10px 12px;border-radius:12px}
+.range input{width:100%}
 .coin{position:absolute;z-index:20;left:50%;top:52%;width:150px;height:150px;border-radius:50%;border:2px dashed #ffffff80;transform:translate(-50%,-50%);display:grid;place-items:center;text-align:center;font-size:11px;letter-spacing:.1em}
 </style>
 </head>
 <body>
-<div class="scene" id="scene">
-  <div class="note">
-    <img src="./assets/ui/idis-logo.png?v=20260821-stage12" alt="IDIS Americas">
-    <b>JS-STAGED MOBILE PREVIEW</b><br>
-    FRONT 0s → MIDDLE 1s → VIDEO 3s. Move your finger/mouse for gentle perspective tilt.
-  </div>
+<div class="scene">
+  <div class="note"><b>BUILD 13 PREVIEW</b><br>FRONT 0s → MIDDLE 1s → VIDEO 3s. Move pointer for stronger 3D. Use the slider to simulate moving closer/farther from the coin.</div>
   <div class="stage" id="stage">
     <video id="back" class="layer back" muted loop playsinline preload="auto">
-      <source src="./assets/parallax/atlanta/layer-1-back.mp4?v=20260821-stage12" type="video/mp4">
+      <source src="./assets/parallax/atlanta/layer-1-back.mp4?v=20260821-4k13" type="video/mp4">
     </video>
-    <img id="mid" class="layer" src="./assets/parallax/atlanta/layer-2-middle.png?v=20260821-stage12">
-    <img id="front" class="layer" src="./assets/parallax/atlanta/layer-3-front.png?v=20260821-stage12">
+    <img id="mid" class="layer" src="./assets/parallax/atlanta/layer-2-middle.png?v=20260821-4k13">
+    <img id="front" class="layer" src="./assets/parallax/atlanta/layer-3-front.png?v=20260821-4k13">
   </div>
   <div class="coin">LIVE COIN<br>AREA</div>
+  <div class="range"><label>Distance zoom <input id="zoom" type="range" min="0.70" max="1.58" value="1" step="0.01"></label></div>
 </div>
 <script>
-const stage=document.querySelector('#stage'),back=document.querySelector('#back'),mid=document.querySelector('#mid'),front=document.querySelector('#front');
+const stage=document.querySelector('#stage'),back=document.querySelector('#back'),mid=document.querySelector('#mid'),front=document.querySelector('#front'),zoom=document.querySelector('#zoom');
 const started=performance.now();
 setTimeout(()=>{back.muted=true;back.play().catch(()=>{})},3000);
-function clamp(v,a,b){return Math.max(a,Math.min(b,v))}
-function ease(t){t=clamp(t,0,1);return 1-Math.pow(1-t,3)}
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const ease=t=>{t=clamp(t,0,1);return 1-Math.pow(1-t,3)};
 let px=.5,py=.5;
 addEventListener('pointermove',e=>{px=e.clientX/innerWidth;py=e.clientY/innerHeight});
 function frame(){
-  const e=performance.now()-started,dx=px-.5,dy=py-.5;
+  const e=performance.now()-started,dx=px-.5,dy=py-.5,z=Number(zoom.value);
   front.style.opacity=ease(e/800);
   mid.style.opacity=ease((e-1000)/900);
   back.style.opacity=ease((e-3000)/1200);
-  stage.style.transform=`rotateX(${dy*-7}deg) rotateY(${dx*7}deg)`;
-  back.style.transform=`translate3d(-50%,-50%,-18px)`;
-  mid.style.transform=`translate3d(calc(-50% + ${dx*25}px),calc(-50% + ${dy*18-15}px),34px)`;
-  front.style.transform=`translate3d(calc(-50% + ${dx*72}px),calc(-50% + ${dy*50}px),105px) scale(${.82+.18*ease(e/900)})`;
+  stage.style.transform=`rotateX(${dy*-12}deg) rotateY(${dx*12}deg) scale(${z})`;
+  back.style.transform='translate3d(-50%,-50%,-95px)';
+  mid.style.transform=`translate3d(calc(-50% + ${dx*30}px),calc(-50% + ${dy*22-15}px),72px)`;
+  front.style.transform=`translate3d(calc(-50% + ${dx*82}px),calc(-50% + ${dy*58}px),245px) scale(${.82+.18*ease(e/900)})`;
   requestAnimationFrame(frame);
 }
 frame();

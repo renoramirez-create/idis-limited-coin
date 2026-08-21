@@ -479,6 +479,8 @@ document.addEventListener('DOMContentLoaded', () => {
   let initializedOverlay = false;
   let frontRevealStart = 0;
   let stageRX = 0, stageRY = 0;
+  let referenceTargetDepth = 0;
+  let smoothDistanceZoom = 1;
 
   const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
   const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
@@ -560,6 +562,8 @@ document.addEventListener('DOMContentLoaded', () => {
     frontRevealStart = 0;
     stageRX = 0;
     stageRY = 0;
+    referenceTargetDepth = 0;
+    smoothDistanceZoom = 1;
 
     clearBackVideoTimer();
     stopBackVideo(true);
@@ -655,7 +659,146 @@ document.addEventListener('DOMContentLoaded', () => {
     forceTransparentRenderer();
   }
 
-  async function waitForLiveCamera(maxMs = 12000) {
+
+  /*
+    Request the highest useful rear-camera mode BEFORE MindAR initializes
+    its tracking pipeline. We try true UHD 3840x2160 first, then step down.
+
+    Important:
+    A browser/OS can refuse 4K even when the phone's native camera app records
+    4K. In that case this falls back to the highest mode the browser exposes.
+  */
+  function install4KCameraPatch(system) {
+    if (!system || system.__idis4KPatched) return;
+
+    const profiles = [
+      {
+        label: '4K UHD',
+        constraints: {
+          audio: false,
+          video: {
+            facingMode: { ideal: 'environment' },
+            width: { exact: 3840 },
+            height: { exact: 2160 },
+            frameRate: { ideal: 30, max: 30 }
+          }
+        }
+      },
+      {
+        label: '1440P',
+        constraints: {
+          audio: false,
+          video: {
+            facingMode: { ideal: 'environment' },
+            width: { exact: 2560 },
+            height: { exact: 1440 },
+            frameRate: { ideal: 30, max: 30 }
+          }
+        }
+      },
+      {
+        label: '1080P',
+        constraints: {
+          audio: false,
+          video: {
+            facingMode: { ideal: 'environment' },
+            width: { exact: 1920 },
+            height: { exact: 1080 },
+            frameRate: { ideal: 30, max: 30 }
+          }
+        }
+      },
+      {
+        label: 'BEST AVAILABLE',
+        constraints: {
+          audio: false,
+          video: {
+            facingMode: { ideal: 'environment' },
+            width: { ideal: 3840 },
+            height: { ideal: 2160 },
+            frameRate: { ideal: 30, max: 30 }
+          }
+        }
+      },
+      {
+        label: 'DEFAULT REAR',
+        constraints: {
+          audio: false,
+          video: { facingMode: { ideal: 'environment' } }
+        }
+      }
+    ];
+
+    system._startVideo = function () {
+      this.video = document.createElement('video');
+      this.video.setAttribute('autoplay', '');
+      this.video.setAttribute('muted', '');
+      this.video.setAttribute('playsinline', '');
+      this.video.setAttribute('webkit-playsinline', '');
+      this.video.muted = true;
+      this.video.playsInline = true;
+      this.video.style.position = 'absolute';
+      this.video.style.top = '0px';
+      this.video.style.left = '0px';
+      this.video.style.zIndex = '-2';
+      this.container.appendChild(this.video);
+
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        this.el.emit('arError', { error: 'VIDEO_FAIL' });
+        return;
+      }
+
+      const tryProfile = async (index = 0) => {
+        if (index >= profiles.length) {
+          this.el.emit('arError', { error: 'VIDEO_FAIL' });
+          return;
+        }
+
+        const profile = profiles[index];
+
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia(profile.constraints);
+          const track = stream.getVideoTracks()[0];
+          const settings = track && track.getSettings ? track.getSettings() : {};
+
+          window.IDIS_CAMERA_INFO = {
+            requested: profile.label,
+            width: settings.width || 0,
+            height: settings.height || 0,
+            frameRate: settings.frameRate || 0,
+            facingMode: settings.facingMode || ''
+          };
+
+          console.info('IDIS camera mode selected', window.IDIS_CAMERA_INFO);
+
+          this.video.addEventListener('loadedmetadata', () => {
+            this.video.setAttribute('width', this.video.videoWidth);
+            this.video.setAttribute('height', this.video.videoHeight);
+
+            window.IDIS_CAMERA_INFO.width = this.video.videoWidth;
+            window.IDIS_CAMERA_INFO.height = this.video.videoHeight;
+
+            document.documentElement.dataset.cameraResolution =
+              `${this.video.videoWidth}x${this.video.videoHeight}`;
+
+            this._startAR();
+          }, { once: true });
+
+          this.video.srcObject = stream;
+        } catch (error) {
+          console.warn(`Camera profile ${profile.label} unavailable`, error);
+          tryProfile(index + 1);
+        }
+      };
+
+      tryProfile(0);
+    };
+
+    system.__idis4KPatched = true;
+    console.info('IDIS 4K camera preference installed');
+  }
+
+  async function waitForLiveCamera(maxMs = 18000) {
     const started = performance.now();
     while (performance.now() - started < maxMs) {
       const video = (arSystem && arSystem.video) || (arContainer && arContainer.querySelector('video'));
@@ -752,6 +895,20 @@ document.addEventListener('DOMContentLoaded', () => {
     };
   }
 
+
+  function getTargetCameraDepth(camera) {
+    if (!camera || !atlantaTarget || !atlantaTarget.object3D) return 0;
+
+    camera.updateMatrixWorld(true);
+    atlantaTarget.object3D.updateMatrixWorld(true);
+
+    const world = new THREE.Vector3();
+    atlantaTarget.object3D.getWorldPosition(world);
+
+    const cameraSpace = world.clone().applyMatrix4(camera.matrixWorldInverse);
+    return Math.max(0.001, Math.abs(cameraSpace.z));
+  }
+
   function updateAtlantaOverlay(force = false) {
     if (!active || currentSide !== 'atlanta' || overlay.classList.contains('hidden')) return;
 
@@ -764,9 +921,33 @@ document.addEventListener('DOMContentLoaded', () => {
     const { x, y, rect, camera } = projected;
     const tilt = getTiltInputs(camera);
 
-    // Large square composition, similar to the preview page.
+    // ------------------------------------------------------------------
+    // DISTANCE-BASED GRAPHIC ZOOM
+    //
+    // The first stable frame becomes the reference distance.
+    // Move closer to the coin -> artwork grows.
+    // Move farther away -> artwork shrinks.
+    // ------------------------------------------------------------------
+    const targetDepth = getTargetCameraDepth(camera);
+
+    if (!referenceTargetDepth || force) {
+      referenceTargetDepth = targetDepth;
+      smoothDistanceZoom = 1;
+    }
+
+    const rawDistanceZoom = clamp(
+      Math.pow(referenceTargetDepth / Math.max(0.001, targetDepth), 0.82),
+      0.70,
+      1.58
+    );
+
+    smoothDistanceZoom = force
+      ? rawDistanceZoom
+      : lerp(smoothDistanceZoom, rawDistanceZoom, 0.075);
+
+    // Large square composition, now multiplied by physical camera distance.
     const longSide = Math.max(window.innerWidth, window.innerHeight);
-    const baseSize = longSide * 0.92;
+    const baseSize = longSide * 0.92 * smoothDistanceZoom;
     const backSize = baseSize * 1.12;
 
     const nx = clamp((x - rect.left - rect.width / 2) / Math.max(1, rect.width / 2), -1, 1);
@@ -784,8 +965,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Gentle 3D plane tilt. We use the coin's perspective (X/Y tilt) but
     // deliberately ignore Z rotation, so logos/text remain upright.
-    const targetRX = clamp(tilt.y * 7.0, -5.5, 5.5);
-    const targetRY = clamp(-tilt.x * 7.0, -5.5, 5.5);
+    const targetRX = clamp(tilt.y * 12.0, -9.0, 9.0);
+    const targetRY = clamp(-tilt.x * 12.0, -9.0, 9.0);
 
     if (!initializedOverlay || force) {
       sx = x; sy = y;
@@ -802,8 +983,8 @@ document.addEventListener('DOMContentLoaded', () => {
       smy = lerp(smy, middleTargetY, 0.10);
       sfx = lerp(sfx, frontTargetX, 0.11);
       sfy = lerp(sfy, frontTargetY, 0.11);
-      stageRX = lerp(stageRX, targetRX, 0.075);
-      stageRY = lerp(stageRY, targetRY, 0.075);
+      stageRX = lerp(stageRX, targetRX, 0.10);
+      stageRY = lerp(stageRY, targetRY, 0.10);
     }
 
     // Perspective origin is the tracked coin, not the center of the phone.
@@ -839,9 +1020,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Real CSS translateZ values enhance the preserve-3d effect.
     // Positive Z is closer to the viewer.
-    const backZ = -18;
-    const middleZ = 34;
-    const frontZ = 105;
+    const backZ = -95;
+    const middleZ = 72;
+    const frontZ = 245;
 
     layerBack.style.width = `${backSize}px`;
     layerBack.style.height = `${backSize}px`;
@@ -967,14 +1148,34 @@ document.addEventListener('DOMContentLoaded', () => {
       arSystem = await waitForSceneSystem();
       if (myToken !== sessionToken) return;
 
+      // Request true UHD before MindAR creates the camera stream.
+      install4KCameraPatch(arSystem);
+
       await Promise.resolve(arSystem.start());
-      await waitForLiveCamera();
+      const cameraVideo = await waitForLiveCamera();
 
       if (myToken !== sessionToken) return;
 
       active = true;
       styleCameraVideos();
-      showScanUI('LOOK FOR THE COIN');
+
+      // Briefly show the ACTUAL browser camera resolution so you can verify
+      // whether the phone/browser granted 4K.
+      const actualW = cameraVideo.videoWidth || 0;
+      const actualH = cameraVideo.videoHeight || 0;
+      const is4K = actualW >= 3800 && actualH >= 2100;
+
+      showScanUI(
+        is4K
+          ? `4K CAMERA • ${actualW} × ${actualH}`
+          : `CAMERA • ${actualW} × ${actualH}`
+      );
+
+      setTimeout(() => {
+        if (active && myToken === sessionToken && !currentSide) {
+          showScanUI('LOOK FOR THE COIN');
+        }
+      }, 1100);
     } catch (error) {
       console.error(error);
       showError('Camera could not start.',

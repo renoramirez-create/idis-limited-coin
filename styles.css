@@ -415,3 +415,30 @@ video.atlanta-layer::-webkit-media-controls-panel {
   transform-style: preserve-3d;
   -webkit-transform-style: preserve-3d;
 }
+
+
+/* ==========================================================================
+   BUILD 13: STRONGER MOBILE 3D DEPTH
+============================================================================ */
+.atlanta-parallax {
+  /*
+    Smaller perspective distance = more noticeable 3D.
+    820px is intentionally stronger than the previous 1450px.
+  */
+  perspective: 820px !important;
+  -webkit-perspective: 820px !important;
+}
+
+.atlanta-parallax-stage {
+  transform-style: preserve-3d !important;
+  -webkit-transform-style: preserve-3d !important;
+  backface-visibility: visible;
+  -webkit-backface-visibility: visible;
+}
+
+.atlanta-layer {
+  transform-style: preserve-3d !important;
+  -webkit-transform-style: preserve-3d !important;
+  backface-visibility: visible;
+  -webkit-backface-visibility: visible;
+}
