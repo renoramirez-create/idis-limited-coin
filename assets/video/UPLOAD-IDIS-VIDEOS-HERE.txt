@@ -1,0 +1,23 @@
+IDIS FACE CINEMATIC MEDIA
+
+REQUIRED:
+assets/video/idis-showcase-alpha.mov
+assets/video/idis-feature-15s.mp4
+
+OPTIONAL BUT RECOMMENDED FOR CHROME / ANDROID:
+assets/video/idis-showcase-alpha.webm
+
+TRANSPARENT VIDEO:
+idis-showcase-alpha.mov
+- use alpha-capable MOV for Safari/iPhone
+- transparent background
+
+OPTIONAL WEBM ALPHA:
+idis-showcase-alpha.webm
+- VP9 WebM with alpha
+- recommended fallback for Chrome/Android
+
+SECOND VIDEO:
+idis-feature-15s.mp4
+- H.264 MP4
+- target length: 15 seconds
