@@ -1,4 +1,125 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>IDIS Corrected Perspective Preview</title><style>
-*{box-sizing:border-box}html,body{margin:0;height:100%;overflow:hidden;background:#071014;color:#fff;font-family:Arial,sans-serif}.scene{position:relative;width:100%;height:100%;overflow:hidden;perspective:820px;perspective-origin:50% 52%;background:radial-gradient(circle at 50% 52%,#19363d 0,#071014 46%,#020405 100%)}.stage{position:absolute;inset:0;transform-style:preserve-3d;transform-origin:50% 52%;will-change:transform}.layer{position:absolute;left:50%;top:52%;width:min(92vh,150vw);height:min(92vh,150vw);object-fit:contain;transform-origin:center;pointer-events:none;will-change:transform,opacity}.back{width:min(103vh,168vw);height:min(103vh,168vw)}.note{position:fixed;z-index:50;top:12px;left:12px;right:12px;padding:11px 13px;border:1px solid #ffffff30;border-radius:12px;background:#071014e6;font-size:12px;line-height:1.45}.range{position:fixed;z-index:55;left:18px;right:18px;bottom:20px;background:#071014e8;border:1px solid #ffffff30;padding:10px 12px;border-radius:12px}.range input{width:100%}.coin{position:absolute;z-index:20;left:50%;top:52%;width:150px;height:150px;border-radius:50%;border:2px dashed #ffffff80;transform:translate(-50%,-50%);display:grid;place-items:center;text-align:center;font-size:11px;letter-spacing:.1em}
-</style></head><body><div class="scene"><div class="note"><b>PERSPECTIVE FIX PREVIEW</b><br>Move your pointer toward an edge. The panel now follows the same viewing perspective instead of reacting in reverse. Roll is ignored so text stays upright.</div><div class="stage" id="stage"><video id="back" class="layer back" muted loop playsinline preload="auto"><source src="./assets/parallax/atlanta/layer-1-back.mp4?v=20260821-perspective14" type="video/mp4"></video><img id="mid" class="layer" src="./assets/parallax/atlanta/layer-2-middle.png?v=20260821-perspective14"><img id="front" class="layer" src="./assets/parallax/atlanta/layer-3-front.png?v=20260821-perspective14"></div><div class="coin">PHYSICAL<br>COIN</div><div class="range"><label>Distance zoom <input id="zoom" type="range" min="0.70" max="1.58" value="1" step="0.01"></label></div></div><script>
-const stage=document.querySelector('#stage'),back=document.querySelector('#back'),mid=document.querySelector('#mid'),front=document.querySelector('#front'),zoom=document.querySelector('#zoom');const started=performance.now();setTimeout(()=>{back.muted=true;back.play().catch(()=>{})},3000);const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));const ease=t=>{t=clamp(t,0,1);return 1-Math.pow(1-t,3)};let px=.5,py=.5;addEventListener('pointermove',e=>{px=e.clientX/innerWidth;py=e.clientY/innerHeight});function frame(){const e=performance.now()-started,dx=px-.5,dy=py-.5,z=Number(zoom.value);front.style.opacity=ease(e/800);mid.style.opacity=ease((e-1000)/900);back.style.opacity=ease((e-3000)/1200);const rotateY=dx*18;const rotateX=-dy*18;stage.style.transform=`rotateX(${rotateX}deg) rotateY(${rotateY}deg) scale(${z})`;back.style.transform='translate3d(-50%,-50%,-95px)';mid.style.transform='translate3d(-50%,calc(-50% - 15px),72px)';front.style.transform=`translate3d(-50%,-50%,245px) scale(${.82+.18*ease(e/900)})`;requestAnimationFrame(frame)}frame();</script></body></html>
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<title>IDIS Interactive Scene Preview</title>
+<style>
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;overflow:hidden;background:#061014;color:white;font-family:Arial,sans-serif;touch-action:none}
+.scene{position:relative;width:100%;height:100%;overflow:hidden;perspective:820px;background:radial-gradient(circle at 50% 50%,#17333b 0,#061014 48%,#020405 100%)}
+.stage{position:absolute;inset:0;transform-style:preserve-3d}
+.layer{position:absolute;object-fit:contain;pointer-events:none;will-change:transform,opacity}
+.note{position:fixed;z-index:30;top:12px;left:12px;right:12px;padding:11px 13px;border:1px solid #ffffff2e;border-radius:12px;background:#061014dc;font-size:12px;line-height:1.45}
+.timer{position:fixed;z-index:31;bottom:18px;left:50%;transform:translateX(-50%);padding:8px 12px;border-radius:999px;border:1px solid #ffffff2e;background:#061014dc;font-size:11px}
+.gesture{position:fixed;inset:0;z-index:20;touch-action:none}
+.reset{position:fixed;z-index:40;right:14px;top:90px;width:44px;height:44px;border-radius:50%;border:1px solid #ffffff3b;background:#061014dd;color:white}
+</style>
+</head>
+<body>
+<div class="scene">
+  <div id="stage" class="stage">
+    <video id="back" class="layer" muted loop playsinline preload="auto">
+      <source src="./assets/parallax/atlanta/layer-1-back.mp4?v=20260821-scene15" type="video/mp4">
+    </video>
+    <img id="mid" class="layer" src="./assets/parallax/atlanta/layer-2-middle.png?v=20260821-scene15">
+    <img id="front" class="layer" src="./assets/parallax/atlanta/layer-3-front.png?v=20260821-scene15">
+  </div>
+
+  <div class="note">
+    <b>INTERACTIVE SCENE MODE</b><br>
+    Drag to move. Pinch to zoom. After 3 seconds without touching, the scene returns to center. The 30-second timer demonstrates the AR presentation timeout.
+  </div>
+
+  <div class="timer"><span id="sec">30</span>s • DRAG • PINCH</div>
+  <button id="reset" class="reset" type="button">↺</button>
+  <div id="gesture" class="gesture"></div>
+</div>
+
+<script>
+const back=document.querySelector('#back'),mid=document.querySelector('#mid'),front=document.querySelector('#front');
+const gesture=document.querySelector('#gesture'),sec=document.querySelector('#sec'),reset=document.querySelector('#reset');
+
+const pointers=new Map();
+let panX=0,panY=0,zoom=1;
+let dragX=0,dragY=0,startPanX=0,startPanY=0;
+let pinchDist=0,pinchZoom=1,pinchMidX=0,pinchMidY=0,pinchPanX=0,pinchPanY=0;
+let lastInteraction=0;
+const started=performance.now();
+const deadline=started+30000;
+
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const lerp=(a,b,t)=>a+(b-a)*t;
+const ease=t=>{t=clamp(t,0,1);return 1-Math.pow(1-t,3)};
+const dist=(a,b)=>Math.hypot(b.x-a.x,b.y-a.y);
+const midPoint=(a,b)=>({x:(a.x+b.x)/2,y:(a.y+b.y)/2});
+
+setTimeout(()=>back.play().catch(()=>{}),3000);
+
+function beginDrag(p){dragX=p.x;dragY=p.y;startPanX=panX;startPanY=panY}
+function beginPinch(){
+  const v=[...pointers.values()]; if(v.length<2)return;
+  const m=midPoint(v[0],v[1]);
+  pinchDist=Math.max(20,dist(v[0],v[1]));
+  pinchZoom=zoom;pinchMidX=m.x;pinchMidY=m.y;pinchPanX=panX;pinchPanY=panY;
+}
+
+gesture.addEventListener('pointerdown',e=>{
+  e.preventDefault();gesture.setPointerCapture(e.pointerId);
+  pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});lastInteraction=performance.now();
+  pointers.size===1?beginDrag([...pointers.values()][0]):beginPinch();
+},{passive:false});
+
+gesture.addEventListener('pointermove',e=>{
+  if(!pointers.has(e.pointerId))return;e.preventDefault();
+  pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});lastInteraction=performance.now();
+  const v=[...pointers.values()];
+  if(v.length===1){
+    panX=startPanX+v[0].x-dragX;panY=startPanY+v[0].y-dragY;
+  }else{
+    const m=midPoint(v[0],v[1]);
+    zoom=clamp(pinchZoom*(dist(v[0],v[1])/pinchDist),.58,2.45);
+    panX=pinchPanX+m.x-pinchMidX;panY=pinchPanY+m.y-pinchMidY;
+  }
+},{passive:false});
+
+function end(e){
+  if(!pointers.has(e.pointerId))return;
+  e.preventDefault();pointers.delete(e.pointerId);lastInteraction=performance.now();
+  if(pointers.size===1)beginDrag([...pointers.values()][0]);else if(pointers.size>=2)beginPinch();
+}
+gesture.addEventListener('pointerup',end,{passive:false});
+gesture.addEventListener('pointercancel',end,{passive:false});
+
+reset.addEventListener('click',()=>{panX=0;panY=0;zoom=1;lastInteraction=0});
+
+function frame(){
+  const now=performance.now(),elapsed=now-started;
+  if(!pointers.size&&lastInteraction&&now-lastInteraction>3000){
+    panX=lerp(panX,0,.105);panY=lerp(panY,0,.105);zoom=lerp(zoom,1,.10);
+  }
+
+  const longSide=Math.max(innerWidth,innerHeight),base=longSide*.92*zoom,backSize=base*1.12;
+  const cx=innerWidth/2,cy=innerHeight/2;
+
+  front.style.opacity=ease(elapsed/800);
+  mid.style.opacity=ease((elapsed-1000)/900);
+  back.style.opacity=ease((elapsed-3000)/1200);
+
+  back.style.width=backSize+'px';back.style.height=backSize+'px';
+  back.style.transform=`translate3d(${cx+panX*.72-backSize/2}px,${cy+panY*.72-backSize/2}px,-95px)`;
+
+  mid.style.width=base+'px';mid.style.height=base+'px';
+  mid.style.transform=`translate3d(${cx+panX*.94-base/2}px,${cy+panY*.94-(40/1920)*base-base/2}px,72px)`;
+
+  front.style.width=base+'px';front.style.height=base+'px';
+  front.style.transform=`translate3d(${cx+panX*1.13-base/2}px,${cy+panY*1.13-base/2}px,245px) scale(${.82+.18*ease(elapsed/900)})`;
+
+  sec.textContent=Math.max(0,Math.ceil((deadline-now)/1000));
+
+  if(now<deadline)requestAnimationFrame(frame);
+}
+frame();
+</script>
+</body>
+</html>
