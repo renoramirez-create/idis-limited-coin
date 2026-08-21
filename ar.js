@@ -470,6 +470,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const endCard = document.querySelector('#end-card');
   const personalizedThanksLine1 = document.querySelector('#personalized-thanks-line1');
+  const personalizedThanksLine2 = document.querySelector('#personalized-thanks-line2');
 
   const TARGET_FILE = './assets/targets/gsx2026-two-sided.mind';
 
@@ -603,6 +604,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     if (guestNameField) {
+      // If this browser already remembers a name, hide the entire
+      // name-entry section. The saved name is still used by the end card.
       guestNameField.classList.toggle(
         'has-memory',
         !!guestName
@@ -611,12 +614,18 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function updatePersonalizedThanks() {
-    if (!personalizedThanksLine1) return;
+    if (!personalizedThanksLine1 || !personalizedThanksLine2) return;
 
-    personalizedThanksLine1.textContent =
-      guestName
-        ? `Thank you, ${guestName}`
-        : 'Thank you';
+    personalizedThanksLine1.textContent = 'Thank you,';
+
+    if (guestName) {
+      personalizedThanksLine2.textContent = guestName;
+      personalizedThanksLine2.style.display = '';
+    } else {
+      personalizedThanksLine2.textContent = 'Guest';
+      personalizedThanksLine2.style.display = 'none';
+      personalizedThanksLine1.textContent = 'Thank you';
+    }
   }
 
   function clearEndCardTimers() {
