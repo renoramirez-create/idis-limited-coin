@@ -1,0 +1,374 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport"
+        content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <title>IDIS 360 Sphere Preview</title>
+
+  <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+
+  <style>
+    * { box-sizing: border-box; }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      background: #02090a;
+      color: #fff;
+      font-family: Arial, Helvetica, sans-serif;
+    }
+
+    #preview {
+      position: fixed;
+      inset: 0;
+      overflow: hidden;
+      background:
+        radial-gradient(circle at 50% 50%, #000 0%, #001316 48%, #05363c 100%);
+    }
+
+    #sphere {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      opacity: 0;
+      transition: opacity 1.2s ease;
+    }
+
+    #sphere.on { opacity: 1; }
+
+    #shade {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background:
+        radial-gradient(circle at 50% 48%, transparent 0%, transparent 55%,
+        rgba(0,0,0,.14) 80%, rgba(0,0,0,.35) 100%);
+    }
+
+    #stage {
+      position: absolute;
+      inset: 0;
+      perspective: 900px;
+      transform-style: preserve-3d;
+      pointer-events: none;
+    }
+
+    #panel {
+      position: absolute;
+      left: 50%;
+      top: 58%;
+      width: min(82vw, 780px);
+      aspect-ratio: 16 / 9;
+      transform: translate3d(-50%, -50%, 70px);
+      background:
+        linear-gradient(135deg, rgba(9,69,76,.94), rgba(2,18,21,.94));
+      border: 1px solid rgba(255,255,255,.13);
+      border-radius: 16px;
+      box-shadow: 0 28px 80px rgba(0,0,0,.55);
+      display: grid;
+      place-items: center;
+      text-align: center;
+      padding: 28px;
+    }
+
+    #tagline {
+      position: absolute;
+      left: 50%;
+      top: 39%;
+      transform: translate3d(-50%, -50%, 320px);
+      white-space: nowrap;
+      font-size: clamp(12px, 1.6vw, 18px);
+      font-weight: 700;
+      letter-spacing: .02em;
+      text-shadow:
+        0 2px 4px rgba(0,0,0,.8),
+        0 8px 18px rgba(0,0,0,.55);
+    }
+
+    #controls {
+      position: absolute;
+      left: 14px;
+      right: 14px;
+      bottom: max(14px, env(safe-area-inset-bottom));
+      z-index: 20;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      justify-content: center;
+    }
+
+    button, label {
+      min-height: 44px;
+      padding: 11px 15px;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,.18);
+      background: rgba(0,0,0,.62);
+      color: #fff;
+      font: inherit;
+      cursor: pointer;
+      backdrop-filter: blur(10px);
+    }
+
+    input[type=file] { display: none; }
+
+    #status {
+      position: absolute;
+      top: max(14px, env(safe-area-inset-top));
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 20;
+      max-width: 92vw;
+      padding: 8px 12px;
+      border-radius: 999px;
+      background: rgba(0,0,0,.55);
+      font-size: 12px;
+      text-align: center;
+    }
+
+    #sourceVideo {
+      position: absolute;
+      width: 2px;
+      height: 2px;
+      opacity: .001;
+      left: -10px;
+    }
+
+    #touch {
+      position: absolute;
+      inset: 0;
+      z-index: 10;
+      touch-action: none;
+      cursor: grab;
+    }
+
+    #touch:active { cursor: grabbing; }
+  </style>
+</head>
+
+<body>
+<div id="preview">
+  <canvas id="sphere"></canvas>
+  <video id="sourceVideo"
+         muted loop playsinline preload="metadata">
+    <source src="./assets/video/idis-sphere-360.mp4?v=20260821-sphere35" type="video/mp4" />
+    <source src="./assets/video/idis-showcase-alpha.webm?v=20260821-sphere35" type="video/webm" />
+  </video>
+
+  <div id="shade"></div>
+
+  <div id="stage">
+    <div id="tagline">One Solution. One Company.</div>
+    <div id="panel">
+      <div>
+        <strong style="font-size:clamp(20px,4vw,42px)">YouTube Feature Plane</strong>
+        <div style="margin-top:10px;opacity:.72">
+          Drag anywhere to look around the sphere.<br>
+          The real build places your YouTube video here.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="touch" aria-label="Drag to look around"></div>
+
+  <div id="status">360 preview ready</div>
+
+  <div id="controls">
+    <button id="play" type="button">PLAY SPHERE</button>
+    <button id="tilt" type="button">ENABLE PHONE TILT</button>
+    <label>
+      CHOOSE 360 VIDEO
+      <input id="file" type="file" accept="video/*" />
+    </label>
+    <button id="reset" type="button">RESET VIEW</button>
+  </div>
+</div>
+
+<script>
+(() => {
+  const THREE = window.AFRAME && window.AFRAME.THREE;
+  const canvas = document.querySelector('#sphere');
+  const video = document.querySelector('#sourceVideo');
+  const stage = document.querySelector('#stage');
+  const touch = document.querySelector('#touch');
+  const status = document.querySelector('#status');
+  const file = document.querySelector('#file');
+
+  let renderer, scene, camera, mesh, texture;
+  let yaw = -4;
+  let pitch = 0;
+  let targetYaw = -4;
+  let targetPitch = 0;
+  let drag = false;
+  let lastX = 0;
+  let lastY = 0;
+  let tiltYaw = 0;
+  let tiltPitch = 0;
+  let objectUrl = '';
+
+  function init() {
+    if (renderer) return;
+
+    renderer = new THREE.WebGLRenderer({
+      canvas,
+      alpha: true,
+      antialias: false,
+      powerPreference: 'high-performance'
+    });
+
+    renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 1.5));
+
+    scene = new THREE.Scene();
+    camera = new THREE.PerspectiveCamera(76, 1, .1, 1200);
+    camera.position.z = .01;
+
+    const geometry = new THREE.SphereGeometry(10, 48, 32);
+    geometry.scale(-1, 1, 1);
+
+    texture = new THREE.VideoTexture(video);
+    texture.minFilter = THREE.LinearFilter;
+    texture.magFilter = THREE.LinearFilter;
+    texture.generateMipmaps = false;
+
+    if ('colorSpace' in texture && THREE.SRGBColorSpace) {
+      texture.colorSpace = THREE.SRGBColorSpace;
+    }
+
+    mesh = new THREE.Mesh(
+      geometry,
+      new THREE.MeshBasicMaterial({ map: texture })
+    );
+
+    scene.add(mesh);
+  }
+
+  function resize() {
+    if (!renderer) return;
+    const w = innerWidth;
+    const h = innerHeight;
+    renderer.setSize(w, h, false);
+    camera.aspect = w / h;
+    camera.updateProjectionMatrix();
+  }
+
+  function frame() {
+    requestAnimationFrame(frame);
+    if (!renderer) return;
+
+    yaw += ((targetYaw + tiltYaw) - yaw) * .08;
+    pitch += ((targetPitch + tiltPitch) - pitch) * .08;
+
+    mesh.rotation.y = THREE.MathUtils.degToRad(yaw);
+    mesh.rotation.x = THREE.MathUtils.degToRad(pitch);
+
+    stage.style.transform =
+      `rotateX(${(pitch * .12).toFixed(2)}deg) ` +
+      `rotateY(${(yaw * .10).toFixed(2)}deg)`;
+
+    renderer.render(scene, camera);
+  }
+
+  async function play() {
+    init();
+    resize();
+
+    try {
+      video.muted = true;
+      await video.play();
+      canvas.classList.add('on');
+      status.textContent =
+        'Sphere active • drag to look around';
+    } catch (error) {
+      status.textContent =
+        'Video could not start. Choose a local 360 video below.';
+      console.warn(error);
+    }
+  }
+
+  touch.addEventListener('pointerdown', event => {
+    drag = true;
+    lastX = event.clientX;
+    lastY = event.clientY;
+    try { touch.setPointerCapture(event.pointerId); } catch (_) {}
+  });
+
+  touch.addEventListener('pointermove', event => {
+    if (!drag) return;
+    event.preventDefault();
+
+    const dx = event.clientX - lastX;
+    const dy = event.clientY - lastY;
+
+    lastX = event.clientX;
+    lastY = event.clientY;
+
+    targetYaw = Math.max(-110, Math.min(110, targetYaw + dx * .20));
+    targetPitch = Math.max(-55, Math.min(55, targetPitch - dy * .16));
+  });
+
+  function endDrag(event) {
+    drag = false;
+    try { touch.releasePointerCapture(event.pointerId); } catch (_) {}
+  }
+
+  touch.addEventListener('pointerup', endDrag);
+  touch.addEventListener('pointercancel', endDrag);
+
+  document.querySelector('#play').addEventListener('click', play);
+
+  document.querySelector('#reset').addEventListener('click', () => {
+    targetYaw = -4;
+    targetPitch = 0;
+    tiltYaw = 0;
+    tiltPitch = 0;
+  });
+
+  document.querySelector('#tilt').addEventListener('click', async () => {
+    try {
+      if (
+        typeof DeviceOrientationEvent !== 'undefined' &&
+        typeof DeviceOrientationEvent.requestPermission === 'function'
+      ) {
+        const result = await DeviceOrientationEvent.requestPermission();
+        if (result !== 'granted') throw new Error('Permission not granted');
+      }
+
+      addEventListener('deviceorientation', event => {
+        if (!Number.isFinite(event.gamma) || !Number.isFinite(event.beta)) return;
+        tiltYaw = Math.max(-28, Math.min(28, event.gamma * .42));
+        tiltPitch = Math.max(-22, Math.min(22, (event.beta - 45) * .25));
+      }, { passive: true });
+
+      status.textContent = 'Phone tilt enabled';
+    } catch (error) {
+      status.textContent = 'Phone tilt unavailable on this browser';
+    }
+  });
+
+  file.addEventListener('change', async () => {
+    const chosen = file.files && file.files[0];
+    if (!chosen) return;
+
+    if (objectUrl) URL.revokeObjectURL(objectUrl);
+    objectUrl = URL.createObjectURL(chosen);
+
+    video.pause();
+    video.src = objectUrl;
+    video.load();
+
+    status.textContent = `Loaded: ${chosen.name}`;
+    await play();
+  });
+
+  addEventListener('resize', resize);
+  init();
+  resize();
+  frame();
+})();
+</script>
+</body>
+</html>
