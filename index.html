@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta name="idis-build" content="20260821-sphere35" />
+  <meta name="idis-build" content="20260821-idistext34" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
   <meta name="theme-color" content="#02070a" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -20,8 +20,8 @@
   -->
   <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
-<link rel="stylesheet" href="./styles.css?v=20260821-sphere35" />
-  <script defer src="./ar.js?v=20260821-sphere35"></script>
+<link rel="stylesheet" href="./styles.css?v=20260821-idistext34" />
+  <script defer src="./ar.js?v=20260821-idistext34"></script>
 </head>
 <body>
   <!--
@@ -40,7 +40,7 @@
 
       <div class="brand-lockup" aria-label="IDIS Americas">
         <img class="idis-ui-logo intro-idis-logo"
-             src="./assets/ui/idis-logo.png?v=20260821-sphere35"
+             src="./assets/ui/idis-logo.png?v=20260821-idistext34"
              alt="IDIS Americas" />
       </div>
 
@@ -79,7 +79,7 @@
     <header id="ar-header" class="ar-ui hidden">
       <div class="mini-brand" aria-label="IDIS Americas">
         <img class="idis-ui-logo header-idis-logo"
-             src="./assets/ui/idis-logo.png?v=20260821-sphere35"
+             src="./assets/ui/idis-logo.png?v=20260821-idistext34"
              alt="IDIS Americas" />
       </div>
       <button id="close-ar" class="icon-button" type="button" aria-label="Close augmented reality">×</button>
@@ -123,12 +123,12 @@
         <video id="atlanta-layer-back" class="atlanta-layer layer-back"
                muted playsinline webkit-playsinline loop preload="metadata"
                aria-hidden="true">
-          <source src="./assets/parallax/atlanta/layer-1-back.mp4?v=20260821-sphere35" type="video/mp4" />
+          <source src="./assets/parallax/atlanta/layer-1-back.mp4?v=20260821-idistext34" type="video/mp4" />
         </video>
         <img id="atlanta-layer-middle" class="atlanta-layer layer-middle"
-             src="./assets/parallax/atlanta/layer-2-middle.png?v=20260821-sphere35" alt="" />
+             src="./assets/parallax/atlanta/layer-2-middle.png?v=20260821-idistext34" alt="" />
         <img id="atlanta-layer-front" class="atlanta-layer layer-front"
-             src="./assets/parallax/atlanta/layer-3-front.png?v=20260821-sphere35" alt="" />
+             src="./assets/parallax/atlanta/layer-3-front.png?v=20260821-idistext34" alt="" />
       </div>
     </div>
 
@@ -139,9 +139,9 @@
 
       1. IDIS face is recognized.
       2. Transparent showcase video plays.
-      3. Its final frame freezes briefly.
-      4. A 360 video sphere fades in and the frozen WebM dissolves away.
-      5. "One Solution. One Company." and the YouTube feature float in front.
+      3. Its final frame remains visible.
+      4. IDIS logo animates into the top center.
+      5. 15-second IDIS feature video plays.
       6. Personalized six-second end card finishes the experience.
     -->
     <div id="idis-cinematic"
@@ -156,29 +156,6 @@
       <div id="idis-cinematic-backdrop"
            class="idis-cinematic-backdrop"
            aria-hidden="true"></div>
-
-      <!--
-        IMMERSIVE SPHERE MODE
-        Preferred source: a 2:1 equirectangular 360 video.
-        Upload to: assets/video/idis-sphere-360.mp4
-
-        If that file is not available, the current WebM is used as a visual
-        fallback so the sphere system can still be tested. A normal flat WebM
-        will look stretched because it was not authored as a 360 panorama.
-      -->
-      <canvas id="idis-sphere-canvas"
-              class="idis-sphere-canvas cinematic-hidden"
-              aria-hidden="true"></canvas>
-
-      <video id="idis-sphere-video"
-             class="idis-sphere-video-source"
-             muted loop playsinline webkit-playsinline preload="none"
-             aria-hidden="true">
-        <source src="./assets/video/idis-sphere-360.mp4?v=20260821-sphere35"
-                type="video/mp4" />
-        <source src="./assets/video/idis-showcase-alpha.webm?v=20260821-sphere35"
-                type="video/webm" />
-      </video>
 
       <!-- Visible transparent/composited showcase surface. -->
       <canvas id="idis-showcase-canvas"
@@ -195,7 +172,7 @@
              class="idis-showcase-video-source"
              muted playsinline webkit-playsinline preload="metadata"
              aria-hidden="true">
-        <source src="./assets/video/idis-showcase-alpha.webm?v=20260821-sphere35"
+        <source src="./assets/video/idis-showcase-alpha.webm?v=20260821-idistext34"
                 type="video/webm" />
       </video>
 
@@ -248,7 +225,7 @@
       <div class="end-card-bg"></div>
       <div class="end-card-content">
         <img class="end-card-logo"
-             src="./assets/ui/idis-logo.png?v=20260821-sphere35"
+             src="./assets/ui/idis-logo.png?v=20260821-idistext34"
              alt="IDIS Americas" />
         <div id="personalized-thanks-line1" class="end-card-line1">Thank you,</div>
         <div id="personalized-thanks-line2" class="end-card-line2">Guest</div>

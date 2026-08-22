@@ -7,7 +7,7 @@
   target recognition; both presentations render as detached HTML/video.
 */
 
-console.info('[IDIS WebAR] Build 35 Sphere Mode: 20260821-sphere35');
+console.info('[IDIS WebAR] Build 34 IDIS Text Tagline: 20260821-idistext34');
 
 document.addEventListener('DOMContentLoaded', () => {
   const scene = document.querySelector('#ar-scene');
@@ -47,8 +47,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const idisCinematic = document.querySelector('#idis-cinematic');
   const idisCinematicBackdrop = document.querySelector('#idis-cinematic-backdrop');
-  const idisSphereCanvas = document.querySelector('#idis-sphere-canvas');
-  const idisSphereVideo = document.querySelector('#idis-sphere-video');
   const idisShowcaseVideo = document.querySelector('#idis-showcase-video');
   const idisShowcaseCanvas = document.querySelector('#idis-showcase-canvas');
   const idisFeatureOverlay = document.querySelector('#idis-feature-overlay');
@@ -79,10 +77,6 @@ document.addEventListener('DOMContentLoaded', () => {
   // wait 6 seconds of actual showcase playback, then CSS fades for 3 seconds.
   const IDIS_BACKDROP_DELAY_MS = 4000;
   const IDIS_BACKDROP_FADE_MS = 1800;
-
-  // Hybrid sphere transition.
-  const IDIS_SPHERE_TRANSITION_MS = 1400;
-  const IDIS_SPHERE_MAX_PIXEL_RATIO = 1.5;
 
   const IDIS_YOUTUBE_VIDEO_ID = 'G7vGMc4Z2os';
   const IDIS_YOUTUBE_START_TIMEOUT_MS = 12000;
@@ -149,16 +143,6 @@ document.addEventListener('DOMContentLoaded', () => {
   let idisAlphaRAF = 0;
   let idisAlphaRendererReady = false;
   let idisAlphaUseVideoFallback = false;
-
-  // Lazy-created THREE.js sphere environment.
-  let idisSphereRenderer = null;
-  let idisSphereScene = null;
-  let idisSphereCamera = null;
-  let idisSphereMesh = null;
-  let idisSphereTexture = null;
-  let idisSphereActive = false;
-  let idisSphereWarm = false;
-  let idisSphereTransitionTimer = null;
 
   // Gesture state shared by both scenes.
   const pointers = new Map();
@@ -1803,409 +1787,6 @@ document.addEventListener('DOMContentLoaded', () => {
       clearTimeout(idisBackdropTimer);
       idisBackdropTimer = null;
     }
-
-    if (idisSphereTransitionTimer) {
-      clearTimeout(idisSphereTransitionTimer);
-      idisSphereTransitionTimer = null;
-    }
-  }
-
-  function prepareIDISSphereVideo() {
-    if (!idisSphereVideo) return;
-
-    try {
-      idisSphereVideo.muted = true;
-      idisSphereVideo.defaultMuted = true;
-      idisSphereVideo.playsInline = true;
-      idisSphereVideo.setAttribute('muted', '');
-      idisSphereVideo.setAttribute('playsinline', '');
-      idisSphereVideo.setAttribute('webkit-playsinline', '');
-    } catch (_) {}
-  }
-
-  function warmIDISSphereVideo() {
-    if (!idisSphereVideo || idisSphereWarm) return;
-
-    idisSphereWarm = true;
-    prepareIDISSphereVideo();
-
-    try {
-      idisSphereVideo.preload = 'auto';
-      idisSphereVideo.load();
-    } catch (_) {}
-  }
-
-  function initIDISSphereRenderer() {
-    if (
-      idisSphereRenderer &&
-      idisSphereScene &&
-      idisSphereCamera &&
-      idisSphereMesh
-    ) {
-      return true;
-    }
-
-    if (!idisSphereCanvas || !idisSphereVideo) {
-      return false;
-    }
-
-    const THREE_NS =
-      window.THREE ||
-      (
-        window.AFRAME &&
-        window.AFRAME.THREE
-      );
-
-    if (!THREE_NS) {
-      console.warn(
-        'THREE is unavailable for IDIS sphere mode.'
-      );
-      return false;
-    }
-
-    try {
-      idisSphereRenderer =
-        new THREE_NS.WebGLRenderer({
-          canvas: idisSphereCanvas,
-          alpha: true,
-          antialias: false,
-          powerPreference: 'high-performance'
-        });
-
-      idisSphereRenderer.setPixelRatio(
-        Math.min(
-          window.devicePixelRatio || 1,
-          IDIS_SPHERE_MAX_PIXEL_RATIO
-        )
-      );
-
-      idisSphereScene =
-        new THREE_NS.Scene();
-
-      idisSphereCamera =
-        new THREE_NS.PerspectiveCamera(
-          76,
-          1,
-          0.1,
-          1200
-        );
-
-      idisSphereCamera.position.set(0, 0, 0.01);
-
-      const geometry =
-        new THREE_NS.SphereGeometry(
-          10,
-          48,
-          32
-        );
-
-      // Reverse the sphere so the texture is visible from INSIDE.
-      geometry.scale(-1, 1, 1);
-
-      idisSphereTexture =
-        new THREE_NS.VideoTexture(
-          idisSphereVideo
-        );
-
-      idisSphereTexture.minFilter =
-        THREE_NS.LinearFilter;
-
-      idisSphereTexture.magFilter =
-        THREE_NS.LinearFilter;
-
-      idisSphereTexture.generateMipmaps =
-        false;
-
-      if (
-        'colorSpace' in idisSphereTexture &&
-        THREE_NS.SRGBColorSpace
-      ) {
-        idisSphereTexture.colorSpace =
-          THREE_NS.SRGBColorSpace;
-      }
-
-      const material =
-        new THREE_NS.MeshBasicMaterial({
-          map: idisSphereTexture
-        });
-
-      idisSphereMesh =
-        new THREE_NS.Mesh(
-          geometry,
-          material
-        );
-
-      // A slight default yaw keeps the environment from feeling perfectly
-      // front-on when it first appears.
-      idisSphereMesh.rotation.y =
-        THREE_NS.MathUtils.degToRad(-4);
-
-      idisSphereScene.add(
-        idisSphereMesh
-      );
-
-      return true;
-    } catch (error) {
-      console.warn(
-        'Could not initialize IDIS sphere:',
-        error
-      );
-      return false;
-    }
-  }
-
-  function resizeIDISSphereRenderer() {
-    if (
-      !idisSphereRenderer ||
-      !idisSphereCanvas ||
-      !idisSphereCamera
-    ) {
-      return;
-    }
-
-    const width =
-      Math.max(
-        1,
-        idisSphereCanvas.clientWidth ||
-        window.innerWidth
-      );
-
-    const height =
-      Math.max(
-        1,
-        idisSphereCanvas.clientHeight ||
-        window.innerHeight
-      );
-
-    const pixelRatio =
-      Math.min(
-        window.devicePixelRatio || 1,
-        IDIS_SPHERE_MAX_PIXEL_RATIO
-      );
-
-    const targetWidth =
-      Math.round(width * pixelRatio);
-
-    const targetHeight =
-      Math.round(height * pixelRatio);
-
-    if (
-      idisSphereCanvas.width !== targetWidth ||
-      idisSphereCanvas.height !== targetHeight
-    ) {
-      idisSphereRenderer.setPixelRatio(
-        pixelRatio
-      );
-
-      idisSphereRenderer.setSize(
-        width,
-        height,
-        false
-      );
-
-      idisSphereCamera.aspect =
-        width / height;
-
-      idisSphereCamera.updateProjectionMatrix();
-    }
-  }
-
-  function renderIDISSphere(phoneTilt) {
-    if (
-      !idisSphereActive ||
-      !idisSphereRenderer ||
-      !idisSphereScene ||
-      !idisSphereCamera ||
-      !idisSphereMesh
-    ) {
-      return;
-    }
-
-    const THREE_NS =
-      window.THREE ||
-      (
-        window.AFRAME &&
-        window.AFRAME.THREE
-      );
-
-    if (!THREE_NS) return;
-
-    resizeIDISSphereRenderer();
-
-    /*
-      "Look around" feel:
-      drag turns the environment much more than the foreground cards,
-      while phone tilt adds natural head-motion parallax.
-
-      panX is already capped around 48% of viewport width.
-      panY is capped around 42% of viewport height.
-    */
-    const dragYaw =
-      (panX / Math.max(1, window.innerWidth)) * 92;
-
-    const dragPitch =
-      -(panY / Math.max(1, window.innerHeight)) * 62;
-
-    const tiltYaw =
-      (phoneTilt?.y || 0) * 2.55;
-
-    const tiltPitch =
-      (phoneTilt?.x || 0) * 2.05;
-
-    const yawDeg = clamp(
-      -4 + dragYaw + tiltYaw,
-      -78,
-      78
-    );
-
-    const pitchDeg = clamp(
-      dragPitch + tiltPitch,
-      -48,
-      48
-    );
-
-    idisSphereMesh.rotation.y =
-      THREE_NS.MathUtils.degToRad(
-        yawDeg
-      );
-
-    idisSphereMesh.rotation.x =
-      THREE_NS.MathUtils.degToRad(
-        pitchDeg
-      );
-
-    idisSphereRenderer.render(
-      idisSphereScene,
-      idisSphereCamera
-    );
-  }
-
-  function stopIDISSphereMode() {
-    idisSphereActive = false;
-
-    if (idisSphereTransitionTimer) {
-      clearTimeout(idisSphereTransitionTimer);
-      idisSphereTransitionTimer = null;
-    }
-
-    if (idisSphereVideo) {
-      try {
-        idisSphereVideo.pause();
-        idisSphereVideo.currentTime = 0;
-      } catch (_) {}
-    }
-
-    if (idisSphereCanvas) {
-      idisSphereCanvas.classList.remove(
-        'sphere-visible'
-      );
-      idisSphereCanvas.classList.add(
-        'cinematic-hidden'
-      );
-    }
-
-    if (idisCinematic) {
-      idisCinematic.classList.remove(
-        'sphere-mode'
-      );
-    }
-
-    if (idisShowcaseCanvas) {
-      idisShowcaseCanvas.classList.remove(
-        'sphere-transition-out'
-      );
-    }
-
-    if (idisShowcaseVideo) {
-      idisShowcaseVideo.classList.remove(
-        'sphere-transition-out'
-      );
-    }
-  }
-
-  function startIDISSphereMode() {
-    if (
-      !active ||
-      currentSide !== 'idis' ||
-      !idisSequenceActive ||
-      !idisSphereVideo ||
-      !idisSphereCanvas
-    ) {
-      return Promise.reject(
-        new Error('IDIS_SPHERE_NOT_AVAILABLE')
-      );
-    }
-
-    prepareIDISSphereVideo();
-
-    if (!initIDISSphereRenderer()) {
-      return Promise.reject(
-        new Error('IDIS_SPHERE_RENDERER_FAIL')
-      );
-    }
-
-    // Rewind for each scan.
-    try {
-      idisSphereVideo.currentTime = 0;
-    } catch (_) {}
-
-    const playPromise =
-      idisSphereVideo.play();
-
-    return (
-      playPromise &&
-      typeof playPromise.then === 'function'
-        ? playPromise
-        : Promise.resolve()
-    ).then(() => {
-      idisSphereActive = true;
-
-      idisSphereCanvas.classList.remove(
-        'cinematic-hidden'
-      );
-
-      if (idisCinematic) {
-        idisCinematic.classList.add(
-          'sphere-mode'
-        );
-      }
-
-      // Prime one frame before fading it up.
-      renderIDISSphere(
-        updatePhoneTilt()
-      );
-
-      void idisSphereCanvas.offsetWidth;
-
-      idisSphereCanvas.classList.add(
-        'sphere-visible'
-      );
-
-      // Dissolve the frozen opening WebM while the sphere comes up.
-      if (idisShowcaseCanvas) {
-        idisShowcaseCanvas.classList.add(
-          'sphere-transition-out'
-        );
-      }
-
-      if (idisShowcaseVideo) {
-        idisShowcaseVideo.classList.add(
-          'sphere-transition-out'
-        );
-      }
-
-      idisSphereTransitionTimer =
-        setTimeout(() => {
-          idisSphereTransitionTimer = null;
-
-          if (
-            idisSequenceActive &&
-            currentSide === 'idis'
-          ) {
-            hideIDISAlphaSurface();
-          }
-        }, IDIS_SPHERE_TRANSITION_MS + 80);
-    });
   }
 
   function resetIDISCinematicSequence() {
@@ -2217,8 +1798,6 @@ document.addEventListener('DOMContentLoaded', () => {
     if (idisCinematicBackdrop) {
       idisCinematicBackdrop.classList.remove('fade-in');
     }
-
-    stopIDISSphereMode();
 
     if (idisFeatureStage) {
       idisFeatureStage.style.transform = '';
@@ -2339,14 +1918,7 @@ document.addEventListener('DOMContentLoaded', () => {
       .then(() => {
         startIDISAlphaRenderLoop();
 
-        // Give the panoramic background time to buffer while the transparent
-        // opening animation is already entertaining the visitor.
-        setTimeout(
-          warmIDISSphereVideo,
-          700
-        );
-
-        // Count the requested backdrop delay from successful video playback,
+        // Count the requested 6 seconds from successful video playback,
         // not from coin recognition or network loading.
         scheduleIDISBackdropFade();
       })
@@ -2686,17 +2258,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     freezeIDISShowcaseFinalFrame();
-
-    startIDISSphereMode()
-      .catch(error => {
-        // The normal frozen WebM + dark-teal background remains a graceful
-        // fallback if the 360 file is missing, slow, or unsupported.
-        console.warn(
-          'IDIS sphere mode unavailable; using frozen showcase fallback:',
-          error
-        );
-      });
-
     launchIDISFeatureSegment();
   }
 
@@ -3095,9 +2656,6 @@ document.addEventListener('DOMContentLoaded', () => {
     );
 
     const phoneTilt = updatePhoneTilt();
-
-    // Render the immersive environment first, then the foreground 3D planes.
-    renderIDISSphere(phoneTilt);
 
     const rx = clamp(
       gestureRX + phoneTilt.x,
@@ -3578,8 +3136,6 @@ document.addEventListener('DOMContentLoaded', () => {
   ------------------------------------------------------------------------ */
 
   // IDIS cinematic media events.
-  prepareIDISSphereVideo();
-
   if (idisShowcaseVideo) {
     prepareIDISCinematicVideo(idisShowcaseVideo);
 
