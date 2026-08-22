@@ -467,9 +467,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const idisCinematic = document.querySelector('#idis-cinematic');
   const idisShowcaseVideo = document.querySelector('#idis-showcase-video');
+  const idisShowcaseCanvas = document.querySelector('#idis-showcase-canvas');
   const idisFeatureOverlay = document.querySelector('#idis-feature-overlay');
   const idisFeatureLogo = document.querySelector('#idis-feature-logo');
-  const idisFeatureYouTubeHost = document.querySelector('#idis-feature-youtube');
+  const idisFeatureVideoWrap = document.querySelector('#idis-feature-video-wrap');
+  const idisFeatureYouTubeHost = document.querySelector('#idis-youtube-player');
 
   const guestNameInput = document.querySelector('#guest-name');
   const guestNameField = document.querySelector('.guest-name-field');
@@ -542,6 +544,16 @@ document.addEventListener('DOMContentLoaded', () => {
   let idisYouTubePlayer = null;
   let idisYouTubeReady = false;
   let idisYouTubePendingPlay = false;
+
+  // GPU compositor for the transparent/black-key showcase.
+  let idisAlphaGL = null;
+  let idisAlphaProgram = null;
+  let idisAlphaTexture = null;
+  let idisAlphaPositionBuffer = null;
+  let idisAlphaTexCoordBuffer = null;
+  let idisAlphaRAF = 0;
+  let idisAlphaRendererReady = false;
+  let idisAlphaUseVideoFallback = false;
 
   // Gesture state shared by both scenes.
   const pointers = new Map();
@@ -1709,6 +1721,446 @@ document.addEventListener('DOMContentLoaded', () => {
      IDIS CINEMATIC SEQUENCE
   ------------------------------------------------------------------------ */
 
+  function compileIDISShader(gl, type, source) {
+    const shader = gl.createShader(type);
+    gl.shaderSource(shader, source);
+    gl.compileShader(shader);
+
+    if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+      const log = gl.getShaderInfoLog(shader);
+      gl.deleteShader(shader);
+      throw new Error(`IDIS_SHADER_ERROR: ${log}`);
+    }
+
+    return shader;
+  }
+
+  function initIDISAlphaRenderer() {
+    if (
+      idisAlphaRendererReady ||
+      idisAlphaUseVideoFallback
+    ) {
+      return idisAlphaRendererReady;
+    }
+
+    if (!idisShowcaseCanvas || !idisShowcaseVideo) {
+      return false;
+    }
+
+    try {
+      const gl =
+        idisShowcaseCanvas.getContext(
+          'webgl',
+          {
+            alpha: true,
+            premultipliedAlpha: false,
+            antialias: false,
+            preserveDrawingBuffer: true
+          }
+        ) ||
+        idisShowcaseCanvas.getContext(
+          'experimental-webgl',
+          {
+            alpha: true,
+            premultipliedAlpha: false,
+            antialias: false,
+            preserveDrawingBuffer: true
+          }
+        );
+
+      if (!gl) {
+        throw new Error('WEBGL_UNAVAILABLE');
+      }
+
+      const vertexSource = `
+        attribute vec2 a_position;
+        attribute vec2 a_texCoord;
+        varying vec2 v_texCoord;
+
+        void main() {
+          gl_Position = vec4(a_position, 0.0, 1.0);
+          v_texCoord = a_texCoord;
+        }
+      `;
+
+      const fragmentSource = `
+        precision mediump float;
+
+        uniform sampler2D u_texture;
+        varying vec2 v_texCoord;
+
+        void main() {
+          vec4 c = texture2D(u_texture, v_texCoord);
+
+          // Preserve genuine decoded alpha where the codec/browser provides it.
+          // If the export came through as fully opaque, remove near-black
+          // pixels as a fallback. This solves the common black-background
+          // WebM export problem without CPU pixel processing.
+          float maxRGB = max(c.r, max(c.g, c.b));
+          float keyedAlpha = smoothstep(0.025, 0.16, maxRGB);
+
+          float decodedHasTransparency =
+            1.0 - step(0.999, c.a);
+
+          float alpha =
+            mix(keyedAlpha, c.a, decodedHasTransparency);
+
+          // Avoid dark fringe on keyed pixels.
+          vec3 rgb = c.rgb;
+
+          gl_FragColor = vec4(rgb, alpha);
+        }
+      `;
+
+      const vertexShader =
+        compileIDISShader(
+          gl,
+          gl.VERTEX_SHADER,
+          vertexSource
+        );
+
+      const fragmentShader =
+        compileIDISShader(
+          gl,
+          gl.FRAGMENT_SHADER,
+          fragmentSource
+        );
+
+      const program = gl.createProgram();
+      gl.attachShader(program, vertexShader);
+      gl.attachShader(program, fragmentShader);
+      gl.linkProgram(program);
+
+      if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+        throw new Error(
+          `IDIS_PROGRAM_ERROR: ${gl.getProgramInfoLog(program)}`
+        );
+      }
+
+      gl.deleteShader(vertexShader);
+      gl.deleteShader(fragmentShader);
+
+      const positionBuffer = gl.createBuffer();
+      gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+      gl.bufferData(
+        gl.ARRAY_BUFFER,
+        new Float32Array([
+          -1, -1,
+           1, -1,
+          -1,  1,
+          -1,  1,
+           1, -1,
+           1,  1
+        ]),
+        gl.STATIC_DRAW
+      );
+
+      const texCoordBuffer = gl.createBuffer();
+      gl.bindBuffer(gl.ARRAY_BUFFER, texCoordBuffer);
+      gl.bufferData(
+        gl.ARRAY_BUFFER,
+        new Float32Array([
+          0, 0,
+          1, 0,
+          0, 1,
+          0, 1,
+          1, 0,
+          1, 1
+        ]),
+        gl.STATIC_DRAW
+      );
+
+      const texture = gl.createTexture();
+      gl.bindTexture(gl.TEXTURE_2D, texture);
+      gl.texParameteri(
+        gl.TEXTURE_2D,
+        gl.TEXTURE_WRAP_S,
+        gl.CLAMP_TO_EDGE
+      );
+      gl.texParameteri(
+        gl.TEXTURE_2D,
+        gl.TEXTURE_WRAP_T,
+        gl.CLAMP_TO_EDGE
+      );
+      gl.texParameteri(
+        gl.TEXTURE_2D,
+        gl.TEXTURE_MIN_FILTER,
+        gl.LINEAR
+      );
+      gl.texParameteri(
+        gl.TEXTURE_2D,
+        gl.TEXTURE_MAG_FILTER,
+        gl.LINEAR
+      );
+
+      gl.useProgram(program);
+
+      const positionLocation =
+        gl.getAttribLocation(
+          program,
+          'a_position'
+        );
+
+      gl.bindBuffer(
+        gl.ARRAY_BUFFER,
+        positionBuffer
+      );
+
+      gl.enableVertexAttribArray(
+        positionLocation
+      );
+
+      gl.vertexAttribPointer(
+        positionLocation,
+        2,
+        gl.FLOAT,
+        false,
+        0,
+        0
+      );
+
+      const texCoordLocation =
+        gl.getAttribLocation(
+          program,
+          'a_texCoord'
+        );
+
+      gl.bindBuffer(
+        gl.ARRAY_BUFFER,
+        texCoordBuffer
+      );
+
+      gl.enableVertexAttribArray(
+        texCoordLocation
+      );
+
+      gl.vertexAttribPointer(
+        texCoordLocation,
+        2,
+        gl.FLOAT,
+        false,
+        0,
+        0
+      );
+
+      const textureLocation =
+        gl.getUniformLocation(
+          program,
+          'u_texture'
+        );
+
+      gl.uniform1i(textureLocation, 0);
+
+      gl.clearColor(0, 0, 0, 0);
+      gl.enable(gl.BLEND);
+      gl.blendFunc(
+        gl.SRC_ALPHA,
+        gl.ONE_MINUS_SRC_ALPHA
+      );
+
+      idisAlphaGL = gl;
+      idisAlphaProgram = program;
+      idisAlphaTexture = texture;
+      idisAlphaPositionBuffer = positionBuffer;
+      idisAlphaTexCoordBuffer = texCoordBuffer;
+      idisAlphaRendererReady = true;
+
+      return true;
+    } catch (error) {
+      console.warn(
+        'IDIS WebGL alpha compositor unavailable:',
+        error
+      );
+
+      idisAlphaUseVideoFallback = true;
+      return false;
+    }
+  }
+
+  function sizeIDISAlphaCanvas() {
+    if (
+      !idisShowcaseCanvas ||
+      !idisShowcaseVideo
+    ) {
+      return;
+    }
+
+    const width =
+      idisShowcaseVideo.videoWidth || 1280;
+
+    const height =
+      idisShowcaseVideo.videoHeight || 720;
+
+    if (
+      idisShowcaseCanvas.width !== width ||
+      idisShowcaseCanvas.height !== height
+    ) {
+      idisShowcaseCanvas.width = width;
+      idisShowcaseCanvas.height = height;
+    }
+
+    if (idisAlphaGL) {
+      idisAlphaGL.viewport(
+        0,
+        0,
+        idisShowcaseCanvas.width,
+        idisShowcaseCanvas.height
+      );
+    }
+  }
+
+  function renderIDISAlphaFrame() {
+    if (
+      !idisAlphaRendererReady ||
+      !idisAlphaGL ||
+      !idisShowcaseVideo ||
+      idisShowcaseVideo.readyState < 2
+    ) {
+      return false;
+    }
+
+    const gl = idisAlphaGL;
+
+    try {
+      sizeIDISAlphaCanvas();
+
+      gl.clear(
+        gl.COLOR_BUFFER_BIT
+      );
+
+      gl.activeTexture(gl.TEXTURE0);
+      gl.bindTexture(
+        gl.TEXTURE_2D,
+        idisAlphaTexture
+      );
+
+      gl.pixelStorei(
+        gl.UNPACK_FLIP_Y_WEBGL,
+        true
+      );
+
+      gl.texImage2D(
+        gl.TEXTURE_2D,
+        0,
+        gl.RGBA,
+        gl.RGBA,
+        gl.UNSIGNED_BYTE,
+        idisShowcaseVideo
+      );
+
+      gl.drawArrays(
+        gl.TRIANGLES,
+        0,
+        6
+      );
+
+      return true;
+    } catch (error) {
+      console.warn(
+        'IDIS alpha frame render failed:',
+        error
+      );
+
+      return false;
+    }
+  }
+
+  function stopIDISAlphaRenderLoop() {
+    if (idisAlphaRAF) {
+      cancelAnimationFrame(idisAlphaRAF);
+      idisAlphaRAF = 0;
+    }
+  }
+
+  function startIDISAlphaRenderLoop() {
+    stopIDISAlphaRenderLoop();
+
+    const tick = () => {
+      idisAlphaRAF = 0;
+
+      if (
+        !idisSequenceActive ||
+        idisSequencePhase !== 'showcase'
+      ) {
+        return;
+      }
+
+      renderIDISAlphaFrame();
+
+      idisAlphaRAF =
+        requestAnimationFrame(tick);
+    };
+
+    idisAlphaRAF =
+      requestAnimationFrame(tick);
+  }
+
+  function showIDISAlphaSurface() {
+    if (idisAlphaUseVideoFallback) {
+      idisShowcaseVideo.classList.add(
+        'webgl-fallback-visible'
+      );
+      return;
+    }
+
+    if (idisShowcaseCanvas) {
+      idisShowcaseCanvas.classList.remove(
+        'cinematic-hidden',
+        'is-frozen',
+        'is-entering'
+      );
+
+      void idisShowcaseCanvas.offsetWidth;
+      idisShowcaseCanvas.classList.add(
+        'is-entering'
+      );
+    }
+  }
+
+  function freezeIDISAlphaSurface() {
+    stopIDISAlphaRenderLoop();
+
+    if (idisAlphaUseVideoFallback) {
+      idisShowcaseVideo.classList.add(
+        'webgl-fallback-visible'
+      );
+      return;
+    }
+
+    renderIDISAlphaFrame();
+
+    if (idisShowcaseCanvas) {
+      idisShowcaseCanvas.classList.remove(
+        'is-entering',
+        'cinematic-hidden'
+      );
+
+      idisShowcaseCanvas.classList.add(
+        'is-frozen'
+      );
+    }
+  }
+
+  function hideIDISAlphaSurface() {
+    stopIDISAlphaRenderLoop();
+
+    if (idisShowcaseCanvas) {
+      idisShowcaseCanvas.classList.remove(
+        'is-entering',
+        'is-frozen'
+      );
+      idisShowcaseCanvas.classList.add(
+        'cinematic-hidden'
+      );
+    }
+
+    if (idisShowcaseVideo) {
+      idisShowcaseVideo.classList.remove(
+        'webgl-fallback-visible'
+      );
+    }
+  }
+
   function prepareIDISCinematicVideo(video) {
     if (!video) return;
 
@@ -1752,12 +2204,9 @@ document.addEventListener('DOMContentLoaded', () => {
     idisSequenceActive = false;
     idisSequencePhase = 'idle';
 
+    hideIDISAlphaSurface();
+
     if (idisShowcaseVideo) {
-      idisShowcaseVideo.classList.remove(
-        'is-entering',
-        'is-frozen'
-      );
-      idisShowcaseVideo.classList.add('cinematic-hidden');
       safeResetIDISVideo(idisShowcaseVideo);
     }
 
@@ -1824,25 +2273,23 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    idisShowcaseVideo.classList.remove(
-      'cinematic-hidden',
-      'is-frozen',
-      'is-entering'
-    );
-
     safeResetIDISVideo(idisShowcaseVideo);
 
-    void idisShowcaseVideo.offsetWidth;
-    idisShowcaseVideo.classList.add('is-entering');
+    initIDISAlphaRenderer();
+    showIDISAlphaSurface();
 
-    playIDISVideo(idisShowcaseVideo).catch(error => {
+    playIDISVideo(idisShowcaseVideo)
+      .then(() => {
+        startIDISAlphaRenderLoop();
+      })
+      .catch(error => {
       console.warn(
         'IDIS transparent showcase could not play:',
         error
       );
 
-      launchIDISFeatureSegment();
-    });
+        launchIDISFeatureSegment();
+      });
   }
 
   function freezeIDISShowcaseFinalFrame() {
@@ -1865,9 +2312,9 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     } catch (_) {}
 
-    idisShowcaseVideo.classList.remove('is-entering');
-    idisShowcaseVideo.classList.remove('cinematic-hidden');
-    idisShowcaseVideo.classList.add('is-frozen');
+    // Render the final decoded frame into the transparent canvas and stop
+    // the render loop. The frozen canvas remains underneath the logo/YouTube.
+    freezeIDISAlphaSurface();
   }
 
   function initializeIDISYouTubePlayer() {
@@ -1883,6 +2330,8 @@ document.addEventListener('DOMContentLoaded', () => {
     idisYouTubePlayer = new YT.Player(
       idisFeatureYouTubeHost,
       {
+        width: '100%',
+        height: '100%',
         videoId: IDIS_YOUTUBE_VIDEO_ID,
 
         playerVars: {
@@ -1894,7 +2343,8 @@ document.addEventListener('DOMContentLoaded', () => {
           rel: 0,
           iv_load_policy: 3,
           modestbranding: 1,
-          origin: window.location.origin
+          origin: window.location.origin,
+          widget_referrer: window.location.href
         },
 
         events: {
@@ -1902,6 +2352,24 @@ document.addEventListener('DOMContentLoaded', () => {
             idisYouTubeReady = true;
 
             try {
+              const iframe =
+                event.target.getIframe();
+
+              iframe.setAttribute(
+                'allow',
+                'autoplay; encrypted-media; picture-in-picture'
+              );
+
+              iframe.setAttribute(
+                'referrerpolicy',
+                'strict-origin-when-cross-origin'
+              );
+
+              iframe.setAttribute(
+                'playsinline',
+                ''
+              );
+
               event.target.mute();
               event.target.cueVideoById(
                 IDIS_YOUTUBE_VIDEO_ID
@@ -2038,8 +2506,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
     try {
       idisYouTubePlayer.mute();
-      idisYouTubePlayer.seekTo(0, true);
-      idisYouTubePlayer.playVideo();
+
+      // loadVideoById is more reliable here than seeking a previously-cued
+      // iframe and then issuing a separate play command.
+      idisYouTubePlayer.loadVideoById({
+        videoId: IDIS_YOUTUBE_VIDEO_ID,
+        startSeconds: 0
+      });
 
       if (idisYouTubeStartTimeout) {
         clearTimeout(idisYouTubeStartTimeout);
@@ -2184,6 +2657,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function startIDISCinematicSequence() {
     resetIDISCinematicSequence();
+
+    console.log(
+      '[IDIS] cinematic start',
+      {
+        webmReady:
+          !!idisShowcaseVideo &&
+          idisShowcaseVideo.readyState,
+        youtubeReady: idisYouTubeReady
+      }
+    );
 
     idisSequenceActive = true;
     idisSequencePhase = 'showcase';
@@ -3053,6 +3536,30 @@ document.addEventListener('DOMContentLoaded', () => {
   // IDIS cinematic media events.
   if (idisShowcaseVideo) {
     prepareIDISCinematicVideo(idisShowcaseVideo);
+
+    idisShowcaseVideo.addEventListener(
+      'loadedmetadata',
+      () => {
+        initIDISAlphaRenderer();
+        sizeIDISAlphaCanvas();
+      }
+    );
+
+    idisShowcaseVideo.addEventListener(
+      'seeked',
+      () => {
+        if (
+          idisSequenceActive &&
+          (
+            idisSequencePhase === 'logo' ||
+            idisSequencePhase === 'feature'
+          )
+        ) {
+          renderIDISAlphaFrame();
+          freezeIDISAlphaSurface();
+        }
+      }
+    );
     idisShowcaseVideo.addEventListener(
       'ended',
       handleIDISShowcaseEnded
