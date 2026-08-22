@@ -7,7 +7,7 @@
   target recognition; both presentations render as detached HTML/video.
 */
 
-console.info('[IDIS WebAR] Build 31 AR Load Order Fix: 20260821-arorder31');
+console.info('[IDIS WebAR] Build 33 IDIS 3D Parallax: 20260821-idis3d33');
 
 document.addEventListener('DOMContentLoaded', () => {
   const scene = document.querySelector('#ar-scene');
@@ -46,9 +46,13 @@ document.addEventListener('DOMContentLoaded', () => {
   const presentationSeconds = document.querySelector('#presentation-seconds');
 
   const idisCinematic = document.querySelector('#idis-cinematic');
+  const idisCinematicBackdrop = document.querySelector('#idis-cinematic-backdrop');
   const idisShowcaseVideo = document.querySelector('#idis-showcase-video');
   const idisShowcaseCanvas = document.querySelector('#idis-showcase-canvas');
   const idisFeatureOverlay = document.querySelector('#idis-feature-overlay');
+  const idisFeatureStage = document.querySelector('#idis-feature-stage');
+  const idisFeatureVideoLayer = document.querySelector('#idis-feature-video-layer');
+  const idisFeatureLogoLayer = document.querySelector('#idis-feature-logo-layer');
   const idisFeatureLogo = document.querySelector('#idis-feature-logo');
   const idisFeatureVideoWrap = document.querySelector('#idis-feature-video-wrap');
   const idisFeatureYouTubeHost = document.querySelector('#idis-youtube-player');
@@ -68,6 +72,11 @@ document.addEventListener('DOMContentLoaded', () => {
   // IDIS is now media-driven.
   const IDIS_LOGO_TO_FEATURE_DELAY_MS = 850;
   const IDIS_CINEMATIC_EXIT_MS = 620;
+
+  // IDIS background takeover:
+  // wait 6 seconds of actual showcase playback, then CSS fades for 3 seconds.
+  const IDIS_BACKDROP_DELAY_MS = 6000;
+  const IDIS_BACKDROP_FADE_MS = 3000;
 
   const IDIS_YOUTUBE_VIDEO_ID = 'G7vGMc4Z2os';
   const IDIS_YOUTUBE_START_TIMEOUT_MS = 12000;
@@ -96,6 +105,7 @@ document.addEventListener('DOMContentLoaded', () => {
   let endCardTimer = null;
   let endCardFadeTimer = null;
   let endCardActive = false;
+  let endCardVariant = 'atlanta';
 
   // Atlanta video reveal.
   let backVideoStartTimer = null;
@@ -116,6 +126,7 @@ document.addEventListener('DOMContentLoaded', () => {
   let idisFeatureStartTimer = null;
   let idisCinematicExitTimer = null;
   let idisYouTubeStartTimeout = null;
+  let idisBackdropTimer = null;
   let idisSequenceActive = false;
   let idisSequencePhase = 'idle';
 
@@ -829,9 +840,29 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  function updatePersonalizedThanks() {
+  function updatePersonalizedThanks(variant = 'atlanta') {
     if (!personalizedThanksLine1 || !personalizedThanksLine2) return;
 
+    const isIDIS = variant === 'idis';
+
+    if (isIDIS) {
+      personalizedThanksLine1.textContent =
+        guestName
+          ? 'See you next time,'
+          : 'See you next time';
+
+      if (guestName) {
+        personalizedThanksLine2.textContent = guestName;
+        personalizedThanksLine2.style.display = '';
+      } else {
+        personalizedThanksLine2.textContent = '';
+        personalizedThanksLine2.style.display = 'none';
+      }
+
+      return;
+    }
+
+    // Atlanta keeps the established closing card.
     personalizedThanksLine1.textContent = 'Thank you,';
 
     if (guestName) {
@@ -862,14 +893,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (!endCard) return;
 
-    endCard.classList.remove('phase-in', 'phase-out');
+    endCard.classList.remove(
+      'phase-in',
+      'phase-out',
+      'is-idis-closing'
+    );
     endCard.classList.add('hidden');
     endCard.setAttribute('aria-hidden', 'true');
   }
 
-  function showEndCard() {
+  function showEndCard(variant = 'atlanta') {
     clearEndCardTimers();
-    updatePersonalizedThanks();
+
+    endCardVariant = variant;
+    updatePersonalizedThanks(variant);
 
     if (!endCard) {
       finishEndCardToScan();
@@ -877,6 +914,11 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     endCardActive = true;
+
+    endCard.classList.toggle(
+      'is-idis-closing',
+      variant === 'idis'
+    );
 
     // Force a clean animation restart every time.
     endCard.classList.remove('hidden', 'phase-in', 'phase-out');
@@ -1740,6 +1782,11 @@ document.addEventListener('DOMContentLoaded', () => {
       clearTimeout(idisYouTubeStartTimeout);
       idisYouTubeStartTimeout = null;
     }
+
+    if (idisBackdropTimer) {
+      clearTimeout(idisBackdropTimer);
+      idisBackdropTimer = null;
+    }
   }
 
   function resetIDISCinematicSequence() {
@@ -1747,6 +1794,25 @@ document.addEventListener('DOMContentLoaded', () => {
 
     idisSequenceActive = false;
     idisSequencePhase = 'idle';
+
+    if (idisCinematicBackdrop) {
+      idisCinematicBackdrop.classList.remove('fade-in');
+    }
+
+    if (idisFeatureStage) {
+      idisFeatureStage.style.transform = '';
+      idisFeatureStage.style.webkitTransform = '';
+    }
+
+    if (idisFeatureVideoLayer) {
+      idisFeatureVideoLayer.style.transform = '';
+      idisFeatureVideoLayer.style.webkitTransform = '';
+    }
+
+    if (idisFeatureLogoLayer) {
+      idisFeatureLogoLayer.style.transform = '';
+      idisFeatureLogoLayer.style.webkitTransform = '';
+    }
 
     hideIDISAlphaSurface();
 
@@ -1800,6 +1866,32 @@ document.addEventListener('DOMContentLoaded', () => {
     idisCinematic.setAttribute('aria-hidden', 'false');
   }
 
+  function scheduleIDISBackdropFade() {
+    if (idisBackdropTimer) {
+      clearTimeout(idisBackdropTimer);
+      idisBackdropTimer = null;
+    }
+
+    if (!idisCinematicBackdrop) return;
+
+    // Always begin a new IDIS presentation fully transparent.
+    idisCinematicBackdrop.classList.remove('fade-in');
+
+    idisBackdropTimer = setTimeout(() => {
+      idisBackdropTimer = null;
+
+      if (
+        !active ||
+        currentSide !== 'idis' ||
+        !idisSequenceActive
+      ) {
+        return;
+      }
+
+      idisCinematicBackdrop.classList.add('fade-in');
+    }, IDIS_BACKDROP_DELAY_MS);
+  }
+
   function startIDISShowcaseVideo() {
     if (
       !active ||
@@ -1825,6 +1917,10 @@ document.addEventListener('DOMContentLoaded', () => {
     playIDISVideo(idisShowcaseVideo)
       .then(() => {
         startIDISAlphaRenderLoop();
+
+        // Count the requested 6 seconds from successful video playback,
+        // not from coin recognition or network loading.
+        scheduleIDISBackdropFade();
       })
       .catch(error => {
       console.warn(
@@ -2203,7 +2299,7 @@ document.addEventListener('DOMContentLoaded', () => {
       resetIDISCinematicSequence();
 
       hideScanUI();
-      showEndCard();
+      showEndCard('idis');
     }, IDIS_CINEMATIC_EXIT_MS);
   }
 
@@ -2536,6 +2632,100 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
+  function renderIDISFeature(now) {
+    if (!idisFeatureStage) return;
+
+    /*
+      Match the Atlanta interaction language:
+      - drag contributes to X/Y rotation
+      - phone motion contributes to X/Y rotation
+      - pinch contributes a restrained overall zoom
+      - separate planes use different pan ratios + Z depth
+    */
+
+    const gestureRX = clamp(
+      -(panY / Math.max(1, window.innerHeight)) * 7,
+      -3.5,
+      3.5
+    );
+
+    const gestureRY = clamp(
+      (panX / Math.max(1, window.innerWidth)) * 8,
+      -4,
+      4
+    );
+
+    const phoneTilt = updatePhoneTilt();
+
+    const rx = clamp(
+      gestureRX + phoneTilt.x,
+      -9.0,
+      9.0
+    );
+
+    const ry = clamp(
+      gestureRY + phoneTilt.y,
+      -10.0,
+      10.0
+    );
+
+    // Keep pinch useful without allowing the embedded video to become huge.
+    const sceneScale = clamp(
+      1 + (zoom - 1) * 0.18,
+      0.90,
+      1.28
+    );
+
+    const stageTransform =
+      `rotateX(${rx.toFixed(3)}deg) ` +
+      `rotateY(${ry.toFixed(3)}deg) ` +
+      `scale(${sceneScale.toFixed(4)})`;
+
+    idisFeatureStage.style.transform =
+      stageTransform;
+
+    idisFeatureStage.style.webkitTransform =
+      stageTransform;
+
+    /*
+      The logo is the foreground-most layer and therefore gets:
+      - the largest lateral parallax
+      - the largest vertical parallax
+      - the greatest translateZ depth
+
+      YouTube stays deeper and moves less.
+    */
+    if (idisFeatureVideoLayer) {
+      const videoX = panX * 0.16;
+      const videoY = panY * 0.16;
+
+      const videoTransform =
+        `translate3d(${videoX.toFixed(2)}px, ` +
+        `${videoY.toFixed(2)}px, 70px)`;
+
+      idisFeatureVideoLayer.style.transform =
+        videoTransform;
+
+      idisFeatureVideoLayer.style.webkitTransform =
+        videoTransform;
+    }
+
+    if (idisFeatureLogoLayer) {
+      const logoX = panX * 0.43;
+      const logoY = panY * 0.43;
+
+      const logoTransform =
+        `translate3d(${logoX.toFixed(2)}px, ` +
+        `${logoY.toFixed(2)}px, 280px)`;
+
+      idisFeatureLogoLayer.style.transform =
+        logoTransform;
+
+      idisFeatureLogoLayer.style.webkitTransform =
+        logoTransform;
+    }
+  }
+
   function renderPresentation(now = performance.now()) {
     if (!active || !currentSide) {
       presentationRAF = 0;
@@ -2546,6 +2736,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (currentSide === 'atlanta') {
       renderAtlanta(now);
+    } else if (currentSide === 'idis') {
+      renderIDISFeature(now);
     }
 
     presentationRAF =
@@ -2708,6 +2900,8 @@ document.addEventListener('DOMContentLoaded', () => {
   function endPresentationToScan() {
     clearPresentationTimer();
 
+    const endingSide = currentSide || 'atlanta';
+
     // Hide the interactive content but do NOT return to scan yet.
     hideAllPresentations();
     hidePresentationControls();
@@ -2720,7 +2914,11 @@ document.addEventListener('DOMContentLoaded', () => {
     // Hide scanner HUD and let the end card own the screen.
     hideScanUI();
 
-    showEndCard();
+    showEndCard(
+      endingSide === 'idis'
+        ? 'idis'
+        : 'atlanta'
+    );
   }
 
   function beginPresentation(side) {
@@ -2765,9 +2963,11 @@ document.addEventListener('DOMContentLoaded', () => {
         timerChip.style.display = 'none';
       }
 
-      // Hide the old target-attached hologram and run the cinematic sequence.
+      // Run the detached IDIS cinematic sequence plus the live preserve-3D
+      // phone/drag parallax render loop.
       removeIDISPresentation();
       startIDISCinematicSequence();
+      renderPresentation();
     }
   }
 

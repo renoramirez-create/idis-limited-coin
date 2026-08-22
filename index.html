@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta name="idis-build" content="20260821-arorder31" />
+  <meta name="idis-build" content="20260821-idis3d33" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
   <meta name="theme-color" content="#02070a" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -20,8 +20,8 @@
   -->
   <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
-<link rel="stylesheet" href="./styles.css?v=20260821-arorder31" />
-  <script defer src="./ar.js?v=20260821-arorder31"></script>
+<link rel="stylesheet" href="./styles.css?v=20260821-idis3d33" />
+  <script defer src="./ar.js?v=20260821-idis3d33"></script>
 </head>
 <body>
   <!--
@@ -40,7 +40,7 @@
 
       <div class="brand-lockup" aria-label="IDIS Americas">
         <img class="idis-ui-logo intro-idis-logo"
-             src="./assets/ui/idis-logo.png?v=20260821-arorder31"
+             src="./assets/ui/idis-logo.png?v=20260821-idis3d33"
              alt="IDIS Americas" />
       </div>
 
@@ -79,7 +79,7 @@
     <header id="ar-header" class="ar-ui hidden">
       <div class="mini-brand" aria-label="IDIS Americas">
         <img class="idis-ui-logo header-idis-logo"
-             src="./assets/ui/idis-logo.png?v=20260821-arorder31"
+             src="./assets/ui/idis-logo.png?v=20260821-idis3d33"
              alt="IDIS Americas" />
       </div>
       <button id="close-ar" class="icon-button" type="button" aria-label="Close augmented reality">×</button>
@@ -123,12 +123,12 @@
         <video id="atlanta-layer-back" class="atlanta-layer layer-back"
                muted playsinline webkit-playsinline loop preload="metadata"
                aria-hidden="true">
-          <source src="./assets/parallax/atlanta/layer-1-back.mp4?v=20260821-arorder31" type="video/mp4" />
+          <source src="./assets/parallax/atlanta/layer-1-back.mp4?v=20260821-idis3d33" type="video/mp4" />
         </video>
         <img id="atlanta-layer-middle" class="atlanta-layer layer-middle"
-             src="./assets/parallax/atlanta/layer-2-middle.png?v=20260821-arorder31" alt="" />
+             src="./assets/parallax/atlanta/layer-2-middle.png?v=20260821-idis3d33" alt="" />
         <img id="atlanta-layer-front" class="atlanta-layer layer-front"
-             src="./assets/parallax/atlanta/layer-3-front.png?v=20260821-arorder31" alt="" />
+             src="./assets/parallax/atlanta/layer-3-front.png?v=20260821-idis3d33" alt="" />
       </div>
     </div>
 
@@ -148,6 +148,15 @@
          class="idis-cinematic cinematic-hidden"
          aria-hidden="true">
 
+      <!--
+        IDIS immersive background.
+        It remains transparent for the first 6 seconds of the showcase.
+        Then it fades to 80% opacity over 3 seconds.
+      -->
+      <div id="idis-cinematic-backdrop"
+           class="idis-cinematic-backdrop"
+           aria-hidden="true"></div>
+
       <!-- Visible transparent/composited showcase surface. -->
       <canvas id="idis-showcase-canvas"
               class="idis-showcase-canvas cinematic-hidden"
@@ -163,7 +172,7 @@
              class="idis-showcase-video-source"
              muted playsinline webkit-playsinline preload="metadata"
              aria-hidden="true">
-        <source src="./assets/video/idis-showcase-alpha.webm?v=20260821-arorder31"
+        <source src="./assets/video/idis-showcase-alpha.webm?v=20260821-idis3d33"
                 type="video/webm" />
       </video>
 
@@ -172,23 +181,37 @@
            aria-hidden="true">
 
         <!--
-          This wrapper NEVER gets replaced by YouTube.
-          The YouTube API only replaces the inner #idis-youtube-player node.
+          Preserve-3D stage:
+          - YouTube sits on the lower depth plane.
+          - IDIS logo sits farthest forward for strongest parallax.
         -->
-        <div id="idis-feature-video-wrap"
-             class="idis-feature-video">
-          <div id="idis-youtube-player"
-               class="idis-youtube-player"
-               data-youtube-id="G7vGMc4Z2os"
-               aria-label="IDIS feature video"></div>
-        </div>
+        <div id="idis-feature-stage"
+             class="idis-feature-stage">
 
-        <!-- Logo intentionally comes after the video wrapper and has
-             a higher z-index so it always renders above YouTube + WebM. -->
-        <img id="idis-feature-logo"
-             class="idis-feature-logo"
-             src="./assets/ui/idis-logo.png?v=20260821-arorder31"
-             alt="IDIS Americas" />
+          <div id="idis-feature-video-layer"
+               class="idis-feature-video-layer">
+            <!--
+              This wrapper NEVER gets replaced by YouTube.
+              The YouTube API only replaces the inner player node.
+            -->
+            <div id="idis-feature-video-wrap"
+                 class="idis-feature-video">
+              <div id="idis-youtube-player"
+                   class="idis-youtube-player"
+                   data-youtube-id="G7vGMc4Z2os"
+                   aria-label="IDIS feature video"></div>
+            </div>
+          </div>
+
+          <div id="idis-feature-logo-layer"
+               class="idis-feature-logo-layer">
+            <img id="idis-feature-logo"
+                 class="idis-feature-logo"
+                 src="./assets/ui/idis-logo.png?v=20260821-idis3d33"
+                 alt="IDIS Americas" />
+          </div>
+
+        </div>
       </div>
     </div>
 
@@ -201,7 +224,7 @@
       <div class="end-card-bg"></div>
       <div class="end-card-content">
         <img class="end-card-logo"
-             src="./assets/ui/idis-logo.png?v=20260821-arorder31"
+             src="./assets/ui/idis-logo.png?v=20260821-idis3d33"
              alt="IDIS Americas" />
         <div id="personalized-thanks-line1" class="end-card-line1">Thank you,</div>
         <div id="personalized-thanks-line2" class="end-card-line2">Guest</div>

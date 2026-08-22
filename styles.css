@@ -1377,3 +1377,209 @@ iframe#idis-youtube-player {
 /* BUILD 30 FAST LOAD: production startup optimization */
 
 /* BUILD 31 AR LOAD ORDER FIX: 20260821-arorder31 */
+
+
+/* ==========================================================================
+   BUILD 32: IDIS 6-SECOND BACKDROP + CUSTOM IDIS CLOSING COPY
+============================================================================ */
+
+/*
+  This layer sits above the live camera but below the transparent showcase.
+
+  Requested look:
+  BLACK in the center -> DARK TEAL toward the outside.
+
+  It begins at opacity 0.
+  JS adds .fade-in after the showcase has PLAYED for 6 seconds.
+  CSS then takes exactly 3 seconds to reach 80% opacity.
+*/
+.idis-cinematic-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  pointer-events: none;
+
+  background:
+    radial-gradient(
+      circle at 50% 48%,
+      #000000 0%,
+      #000000 18%,
+      #001316 46%,
+      #03292e 72%,
+      #06434a 100%
+    );
+
+  opacity: 0;
+  visibility: visible;
+
+  transition:
+    opacity 3000ms cubic-bezier(.22,.61,.36,1);
+
+  will-change: opacity;
+}
+
+.idis-cinematic-backdrop.fade-in {
+  opacity: .80;
+}
+
+/*
+  Explicit production stacking for the IDIS sequence:
+
+  80  IDIS logo
+  40  YouTube
+  30  feature overlay
+  10  transparent/frozen showcase
+   5  black -> dark teal backdrop
+   0  live camera
+*/
+.idis-showcase-canvas {
+  z-index: 10 !important;
+}
+
+.idis-feature-overlay {
+  z-index: 30 !important;
+}
+
+#idis-feature-video-wrap {
+  z-index: 40 !important;
+}
+
+.idis-feature-logo {
+  z-index: 80 !important;
+}
+
+
+/* The same end-card layout is reused, but JS supplies IDIS-specific copy. */
+.end-card.is-idis-closing .end-card-line1 {
+  font-size: clamp(30px, 6.4vw, 68px);
+  letter-spacing: -.025em;
+}
+
+.end-card.is-idis-closing .end-card-line2 {
+  font-size: clamp(42px, 10vw, 104px);
+}
+
+
+
+/* ==========================================================================
+   BUILD 33: IDIS PRESERVE-3D YOUTUBE + HIGH-PARALLAX LOGO
+============================================================================ */
+
+/*
+  The overlay owns perspective.
+  The stage rotates as the phone tilts / user drags.
+  The logo and video are separate Z-depth planes.
+*/
+.idis-feature-overlay {
+  perspective: 920px;
+  -webkit-perspective: 920px;
+  perspective-origin: 50% 50%;
+  overflow: visible !important;
+}
+
+.idis-feature-stage {
+  position: absolute;
+  inset: 0;
+  z-index: 35;
+
+  transform-style: preserve-3d;
+  -webkit-transform-style: preserve-3d;
+
+  transform-origin: 50% 52%;
+  -webkit-transform-origin: 50% 52%;
+
+  will-change: transform;
+  pointer-events: none;
+}
+
+/* Lower / deeper plane: YouTube */
+.idis-feature-video-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 40;
+
+  transform-style: preserve-3d;
+  -webkit-transform-style: preserve-3d;
+
+  transform: translate3d(0, 0, 70px);
+  -webkit-transform: translate3d(0, 0, 70px);
+
+  will-change: transform;
+  pointer-events: none;
+}
+
+/* Highest / closest plane: IDIS logo */
+.idis-feature-logo-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 90;
+
+  transform-style: preserve-3d;
+  -webkit-transform-style: preserve-3d;
+
+  transform: translate3d(0, 0, 280px);
+  -webkit-transform: translate3d(0, 0, 280px);
+
+  will-change: transform;
+  pointer-events: none;
+}
+
+/*
+  Lower the logo from the top edge and place it in the upper-middle area.
+  It can overlap the top edge of the YouTube plane slightly as the scene tilts.
+*/
+.idis-feature-logo {
+  top: 33% !important;
+  z-index: 100 !important;
+  width: clamp(126px, 25vw, 230px) !important;
+}
+
+/*
+  Keep the YouTube panel centered slightly below the logo.
+  The outer .idis-feature-video-layer handles live parallax, so the existing
+  wrapper can keep its fade/scale entrance animation.
+*/
+#idis-feature-video-wrap {
+  top: 57% !important;
+  z-index: 45 !important;
+
+  transform-style: preserve-3d;
+  -webkit-transform-style: preserve-3d;
+
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+/* Additional depth shadow makes rotation read more clearly. */
+.idis-feature-overlay.video-in #idis-feature-video-wrap {
+  box-shadow:
+    0 28px 84px rgba(0,0,0,.54),
+    0 0 0 1px rgba(255,255,255,.10);
+}
+
+@media (max-width: 420px) {
+  .idis-feature-overlay {
+    perspective: 760px;
+    -webkit-perspective: 760px;
+  }
+
+  .idis-feature-logo {
+    top: 31% !important;
+    width: clamp(112px, 32vw, 180px) !important;
+  }
+
+  #idis-feature-video-wrap {
+    top: 58% !important;
+  }
+
+  .idis-feature-logo-layer {
+    transform: translate3d(0, 0, 240px);
+    -webkit-transform: translate3d(0, 0, 240px);
+  }
+
+  .idis-feature-video-layer {
+    transform: translate3d(0, 0, 58px);
+    -webkit-transform: translate3d(0, 0, 58px);
+  }
+}
+
