@@ -7,7 +7,7 @@
   target recognition; both presentations render as detached HTML/video.
 */
 
-console.info('[IDIS WebAR] Build 30 Fast Load: 20260821-fast30opt');
+console.info('[IDIS WebAR] Build 31 AR Load Order Fix: 20260821-arorder31');
 
 document.addEventListener('DOMContentLoaded', () => {
   const scene = document.querySelector('#ar-scene');
@@ -1121,7 +1121,9 @@ document.addEventListener('DOMContentLoaded', () => {
       await wait(80);
     }
 
-    throw new Error('MindAR image system did not initialize in time.');
+    throw new Error(
+      'MindAR image system did not initialize in time. Verify A-Frame loaded before MindAR.'
+    );
   }
 
   async function verifyTargetFile() {
