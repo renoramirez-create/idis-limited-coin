@@ -7,7 +7,7 @@
   target recognition; both presentations render as detached HTML/video.
 */
 
-console.info('[IDIS WebAR] Build 33 IDIS 3D Parallax: 20260821-idis3d33');
+console.info('[IDIS WebAR] Build 34 IDIS Text Tagline: 20260821-idistext34');
 
 document.addEventListener('DOMContentLoaded', () => {
   const scene = document.querySelector('#ar-scene');
@@ -75,8 +75,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // IDIS background takeover:
   // wait 6 seconds of actual showcase playback, then CSS fades for 3 seconds.
-  const IDIS_BACKDROP_DELAY_MS = 6000;
-  const IDIS_BACKDROP_FADE_MS = 3000;
+  const IDIS_BACKDROP_DELAY_MS = 4000;
+  const IDIS_BACKDROP_FADE_MS = 1800;
 
   const IDIS_YOUTUBE_VIDEO_ID = 'G7vGMc4Z2os';
   const IDIS_YOUTUBE_START_TIMEOUT_MS = 12000;
@@ -2711,12 +2711,12 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     if (idisFeatureLogoLayer) {
-      const logoX = panX * 0.43;
-      const logoY = panY * 0.43;
+      const logoX = panX * 0.48;
+      const logoY = panY * 0.48;
 
       const logoTransform =
         `translate3d(${logoX.toFixed(2)}px, ` +
-        `${logoY.toFixed(2)}px, 280px)`;
+        `${logoY.toFixed(2)}px, 320px)`;
 
       idisFeatureLogoLayer.style.transform =
         logoTransform;

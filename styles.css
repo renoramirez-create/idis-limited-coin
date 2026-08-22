@@ -1583,3 +1583,103 @@ iframe#idis-youtube-player {
   }
 }
 
+
+
+/* ==========================================================================
+   BUILD 34: IDIS TEXT TAGLINE + LARGER BACK VIDEO + FASTER FULL BACKDROP
+   Cache key: 20260821-idistext34
+============================================================================ */
+
+/* Make the transparent/frozen back video larger on the IDIS side. */
+.idis-showcase-canvas {
+  width: min(114vw, 1420px) !important;
+  height: min(98vh, 1420px) !important;
+}
+
+.idis-showcase-video-source.webgl-fallback-visible {
+  width: min(114vw, 1420px) !important;
+  height: min(98vh, 1420px) !important;
+}
+
+@media (max-width: 420px) {
+  .idis-showcase-canvas,
+  .idis-showcase-video-source.webgl-fallback-visible {
+    width: 112vw !important;
+    height: 88vh !important;
+  }
+}
+
+/*
+  Dark backdrop now feels stronger and quicker:
+  - full opacity
+  - faster transition
+*/
+.idis-cinematic-backdrop {
+  transition: opacity 1800ms cubic-bezier(.22,.61,.36,1) !important;
+}
+
+.idis-cinematic-backdrop.fade-in {
+  opacity: 1 !important;
+}
+
+/*
+  Keep the foreground text as the highest parallax plane, but replace the
+  floating logo image with a compact one-line tagline.
+*/
+.idis-feature-logo-layer {
+  transform: translate3d(0, 0, 320px) !important;
+  -webkit-transform: translate3d(0, 0, 320px) !important;
+}
+
+.idis-feature-logo {
+  position: absolute !important;
+  left: 50% !important;
+  top: 39% !important;
+  transform: translateX(-50%) !important;
+  -webkit-transform: translateX(-50%) !important;
+  width: auto !important;
+  max-width: 88vw;
+  padding: 0 !important;
+  margin: 0 !important;
+  color: #ffffff !important;
+  font-size: clamp(11px, 1.45vw, 18px) !important;
+  line-height: 1.1 !important;
+  font-weight: 700 !important;
+  letter-spacing: .02em !important;
+  text-transform: none !important;
+  text-align: center !important;
+  white-space: nowrap !important;
+  text-shadow:
+    0 2px 4px rgba(0,0,0,.72),
+    0 8px 18px rgba(0,0,0,.48) !important;
+  filter: none !important;
+  opacity: 0;
+}
+
+.idis-feature-overlay.logo-in .idis-feature-logo {
+  animation: idisTaglineIn 720ms cubic-bezier(.16,.84,.26,1) forwards;
+}
+
+@keyframes idisTaglineIn {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-16px) scale(.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0) scale(1);
+  }
+}
+
+@media (max-width: 420px) {
+  .idis-feature-logo {
+    top: 37% !important;
+    font-size: clamp(10px, 3.05vw, 14px) !important;
+    max-width: 92vw;
+  }
+
+  .idis-feature-logo-layer {
+    transform: translate3d(0, 0, 270px) !important;
+    -webkit-transform: translate3d(0, 0, 270px) !important;
+  }
+}
