@@ -3576,27 +3576,6 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  if (idisFeatureVideo) {
-    prepareIDISCinematicVideo(idisFeatureVideo);
-    idisFeatureVideo.addEventListener(
-      'ended',
-      handleIDISFeatureEnded
-    );
-
-    idisFeatureVideo.addEventListener('error', () => {
-      if (
-        idisSequenceActive &&
-        (
-          idisSequencePhase === 'logo' ||
-          idisSequencePhase === 'feature'
-        )
-      ) {
-        console.warn('IDIS feature video source error.');
-        finishIDISCinematicSequence();
-      }
-    });
-  }
-
   // Prepare the embedded YouTube player early so it is ready by the time
   // the transparent IDIS showcase finishes.
   ensureIDISYouTubeAPI();
